@@ -1,19 +1,59 @@
-import { Outlet } from 'react-router-dom';
+import React from "react";
+import { Outlet, Link } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
-export default function MainLayout() {
+const MainLayout: React.FC = () => {
+  const { isAuthenticated, logout, user } = useAuth();
+
   return (
-    <div className="min-h-screen bg-white text-[#37352f] selection:bg-[#cce2ff] font-sans">
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-[#e9e9e7]">
-        <div className="max-w-5xl mx-auto px-6 h-12 flex items-center gap-2 text-sm font-medium">
-          <span className="bg-[#f1f1ef] px-2 py-0.5 rounded text-[#73726e]">UberEats Clone</span>
-          <span className="text-[#e9e9e7]">/</span>
-          <span>System Status</span>
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center">
+              <Link to="/" className="text-xl font-bold text-green-600">
+                UberEats
+              </Link>
+            </div>
+            <div className="flex items-center space-x-4">
+              {isAuthenticated ? (
+                <>
+                  <span className="text-sm text-gray-600">
+                    Hello, {user?.username}
+                  </span>
+                  <button
+                    onClick={logout}
+                    className="text-sm font-medium text-red-600 hover:text-red-500"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="text-sm font-medium bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                  >
+                    Sign up
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
-      <main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Outlet />
       </main>
     </div>
   );
-}
+};
+
+export default MainLayout;
