@@ -1,73 +1,105 @@
-# React + TypeScript + Vite
+# UberEats Clone - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the frontend application for the UberEats Clone, built with modern web technologies to ensure a scalable, maintainable, and high-performance user interface.
 
-Currently, two official plugins are available:
+## Technologies Used
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Framework**: [React 19](https://react.dev/)
+- **Bundler**: [Vite](https://vitejs.dev/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Routing**: [React Router v7](https://reactrouter.com/)
+- **API Client**: [Axios](https://axios-http.com/)
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Getting Started
 
-## Expanding the ESLint configuration
+### Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Ensure you have the following installed:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- `npm` (comes with Node.js)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Navigate to the frontend directory:
+
+   ```bash
+   cd frontend
+   ```
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   Ensure the `VITE_API_URL` points to your local backend server (e.g., `http://localhost:8000/api`).
+
+### Running the Application
+
+To start the development server with Hot Module Replacement (HMR):
+
+```bash
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+To build the application for production:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
 ```
+
+To preview the production build locally:
+
+```bash
+npm run preview
+```
+
+---
+
+## Architecture & Folder Structure
+
+This project follows a **Feature-Sliced Design** to ensure scalability as the application grows.
+
+```text
+src/
+├── api/             # Global Axios configuration and interceptors
+├── assets/          # Static files (images, SVGs, custom fonts)
+├── components/      # Global, reusable UI components (Buttons, Inputs, Layouts)
+├── context/         # Global React Contexts (e.g., AuthContext)
+├── features/        # Feature-based modules (Core of the app's business logic)
+│   ├── auth/        # Auth logic, services, and types
+│   ├── restaurants/ # Restaurant-related logic
+│   ├── cart/        # Cart and checkout logic
+│   └── orders/      # Order history and tracking
+├── hooks/           # Global custom hooks (e.g., useAuth)
+├── layouts/         # Page layout wrappers (MainLayout, AuthLayout)
+├── pages/           # High-level route entry points
+├── routes/          # Application routing configuration
+├── types/           # Shared global TypeScript definitions
+└── utils/           # Helper functions (formatters, parsers)
+```
+
+---
+
+## Development Best Practices
+
+### 1. Feature Separation
+
+Do not dump all components into `src/components`. If a component, type, or service is specific to a feature (e.g., `RestaurantCard`), it should live inside its respective folder in `src/features/`.
+
+### 2. API Calls
+
+All HTTP requests should route through `src/api/client.ts`. Feature-specific API requests should be defined in their own service files (e.g., `src/features/auth/services/auth.service.ts`).
+
+### 3. State Management
+
+Authentication state is managed via React Context (`AuthContext`). Avoid introducing heavy state management libraries like Redux unless there is a strongly justified architectural need.
+
+### 4. Styling
+
+Use Tailwind utility classes directly in your JSX. Avoid writing custom CSS files unless absolutely necessary (e.g., complex keyframe animations).
