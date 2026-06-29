@@ -9,10 +9,10 @@ class RestaurantCRUD(ModelViewSet):
     serializer_class = RestaurantSerializer
 
 class CategoryCRUD(ModelViewSet):
-    queryset = Restaurant.objects.all()
+    queryset = Category.objects.all()
     serializer_class = CategorySerializer
     
 class MenuItemCRUD(ModelViewSet):
-    queryset = Restaurant.objects.all()
+    queryset = MenuItem.objects.all()
     serializer_class = MenuItemSerializer
     
