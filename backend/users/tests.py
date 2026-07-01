@@ -93,6 +93,50 @@ class RegisterApiTests(APITestCase):
         self.assertEqual(user.username, 'test.user1')
         self.assertTrue(Profile.objects.filter(user=user).exists())
 
+    def test_register_saves_optional_profile_fields(self) -> None:
+        response = cast(
+            Response,
+            self.client.post(
+                self.url,
+                {
+                    'email': 'profile@example.com',
+                    'password': 'TestPass123!',
+                    'role': 'Client',
+                    'phone_number': '+380000000000',
+                    'address': 'Kyiv',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = cast(Any, UserModel.objects.get(email='profile@example.com'))
+        self.assertEqual(user.profile.phone_number, '+380000000000')
+        self.assertEqual(user.profile.address, 'Kyiv')
+
+    def test_register_existing_email_returns_clear_error(self) -> None:
+        UserModel.objects.create_user(
+            username='existing',
+            email='existing@example.com',
+            password='TestPass123!',
+        )
+
+        response = cast(
+            Response,
+            self.client.post(
+                self.url,
+                {
+                    'email': 'existing@example.com',
+                    'password': 'TestPass123!',
+                    'role': 'Client',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('already exists', str(response.data['email'][0]))
+
 
 class JwtAuthApiTests(APITestCase):
     def setUp(self) -> None:
@@ -141,6 +185,38 @@ class JwtAuthApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
+
+    def test_login_unknown_email_returns_clear_error(self) -> None:
+        response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {
+                    'email': 'missing@example.com',
+                    'password': 'TestPass123!',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data['detail'], 'No account found with this email.')
+
+    def test_login_wrong_password_returns_clear_error(self) -> None:
+        response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {
+                    'email': 'john@example.com',
+                    'password': 'WrongPass123!',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.data['detail'], 'Incorrect password.')
 
     def test_refresh_returns_new_access_token(self) -> None:
         login_data = self.authenticate()

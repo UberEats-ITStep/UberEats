@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import type { FC, FormEvent, ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../hooks/useAuth';
+import { getAuthError } from '../utils/getAuthError';
 
 const LoginForm: FC = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
 
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [requestError, setRequestError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validate = (): boolean => {
     const newErrors: { email?: string; password?: string } = {};
@@ -29,17 +35,28 @@ const LoginForm: FC = () => {
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
+    setRequestError('');
     if (errors[name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
   };
 
-  const handleLogin = (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      // Placeholder for future API integration
-      console.log('Login submitted with data:', formData);
+    if (!validate()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setRequestError('');
+
+    try {
+      await login(formData);
+      navigate('/profile', { replace: true });
+    } catch (error) {
+      setRequestError(getAuthError(error, 'Unable to sign in. Please try again.'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -98,11 +115,17 @@ const LoginForm: FC = () => {
         </div>
 
         <div>
+          {requestError && (
+            <p className="mb-4 text-sm text-center text-red-600" role="alert">
+              {requestError}
+            </p>
+          )}
           <button
             type="submit"
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+            disabled={isSubmitting}
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Sign in
+            {isSubmitting ? 'Signing in...' : 'Sign in'}
           </button>
         </div>
       </form>
