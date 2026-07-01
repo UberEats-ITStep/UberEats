@@ -3,7 +3,7 @@ import { Outlet, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 const MainLayout: React.FC = () => {
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -18,9 +18,12 @@ const MainLayout: React.FC = () => {
             <div className="flex items-center space-x-4">
               {isAuthenticated ? (
                 <>
-                  <span className="text-sm text-gray-600">
-                    Hello, {user?.username}
-                  </span>
+                  <Link
+                    to="/profile"
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    Profile
+                  </Link>
                   <button
                     onClick={logout}
                     className="text-sm font-medium text-red-600 hover:text-red-500"

@@ -1,15 +1,23 @@
 import { useState } from "react";
 import type { FC, FormEvent, ChangeEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../../hooks/useAuth";
+import { getAuthError } from "../utils/getAuthError";
 
 const RegisterForm: FC = () => {
+  const navigate = useNavigate();
+  const { register } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     confirmPassword: "",
+    phoneNumber: "",
+    address: "",
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [requestError, setRequestError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validate = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -41,22 +49,34 @@ const RegisterForm: FC = () => {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setRequestError("");
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  const handleRegister = (e: FormEvent) => {
+  const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      // Exclude confirmPassword from the actual submitted data as required by the backend
-      const submitData = {
+    if (!validate()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setRequestError("");
+
+    try {
+      await register({
         email: formData.email,
         password: formData.password,
-        role: 'Client', // Hardcoded as per UI requirement, Courier flow will be separate
-      };
-      // Placeholder for future API integration
-      console.log("Register submitted with data:", submitData);
+        role: "Client",
+        phone_number: formData.phoneNumber.trim() || undefined,
+        address: formData.address.trim() || undefined,
+      });
+      navigate("/profile", { replace: true });
+    } catch (error) {
+      setRequestError(getAuthError(error, "Unable to create your account. Please try again."));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -159,14 +179,62 @@ const RegisterForm: FC = () => {
               )}
             </div>
           </div>
+
+          <div>
+            <label
+              htmlFor="phoneNumber"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Phone number <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <div className="mt-1">
+              <input
+                id="phoneNumber"
+                name="phoneNumber"
+                type="tel"
+                autoComplete="tel"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 focus:ring-green-500 focus:border-green-500 rounded-md shadow-sm placeholder-gray-400 focus:outline-none sm:text-sm"
+                placeholder="+380 00 000 0000"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="address"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Address <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <div className="mt-1">
+              <input
+                id="address"
+                name="address"
+                type="text"
+                autoComplete="street-address"
+                value={formData.address}
+                onChange={handleChange}
+                className="appearance-none block w-full px-3 py-2 border border-gray-300 focus:ring-green-500 focus:border-green-500 rounded-md shadow-sm placeholder-gray-400 focus:outline-none sm:text-sm"
+                placeholder="Delivery address"
+              />
+            </div>
+          </div>
         </div>
 
         <div>
+          {requestError && (
+            <p className="mb-4 text-sm text-center text-red-600" role="alert">
+              {requestError}
+            </p>
+          )}
           <button
             type="submit"
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+            disabled={isSubmitting}
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Sign up
+            {isSubmitting ? "Creating account..." : "Sign up"}
           </button>
         </div>
       </form>
