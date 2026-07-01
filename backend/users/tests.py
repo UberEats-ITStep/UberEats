@@ -1,3 +1,196 @@
-from django.test import TestCase
+from typing import Any, cast
 
-# Create your tests here.
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.test import APITestCase
+
+from .models import Profile
+
+
+# Start PostgreSQL before running these tests; the backend test suite expects the real database.
+UserModel: Any = get_user_model()
+
+
+class UserModelTests(TestCase):
+    def test_user_creation_creates_profile(self) -> None:
+        user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='john',
+                email='john@example.com',
+                password='pass12345',
+                role='Courier',
+            ),
+        )
+
+        self.assertIsNotNone(user.created_at)
+        self.assertEqual(user.role, 'Courier')
+        self.assertTrue(Profile.objects.filter(user=user).exists())
+        self.assertEqual(user.profile.user, user)
+
+    def test_user_save_keeps_single_profile(self) -> None:
+        user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='jane',
+                email='jane@example.com',
+                password='pass12345',
+            ),
+        )
+
+        profile_id = user.profile.id
+        user.first_name = 'Jane'
+        user.save()
+
+        self.assertEqual(Profile.objects.filter(user=user).count(), 1)
+        self.assertEqual(user.profile.id, profile_id)
+
+    def test_profile_string_representation_uses_email(self) -> None:
+        user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='alex',
+                email='alex@example.com',
+                password='pass12345',
+            ),
+        )
+
+        self.assertEqual(str(user.profile), 'alex@example.com Profile')
+
+
+class RegisterApiTests(APITestCase):
+    def setUp(self) -> None:
+        self.url = reverse('register')
+
+    def test_register_creates_user_profile_and_unique_username(self) -> None:
+        UserModel.objects.create_user(
+            username='test.user',
+            email='existing@example.com',
+            password='pass12345',
+        )
+
+        response = cast(
+            Response,
+            self.client.post(
+                self.url,
+                {
+                    'email': 'test.user@example.com',
+                    'password': 'TestPass123!',
+                    'role': 'Client',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['email'], 'test.user@example.com')
+        self.assertEqual(response.data['role'], 'Client')
+
+        user = cast(Any, UserModel.objects.get(email='test.user@example.com'))
+        self.assertEqual(user.username, 'test.user1')
+        self.assertTrue(Profile.objects.filter(user=user).exists())
+
+
+class JwtAuthApiTests(APITestCase):
+    def setUp(self) -> None:
+        self.user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='john',
+                email='john@example.com',
+                password='TestPass123!',
+                role='Client',
+            ),
+        )
+        self.login_url = reverse('login')
+        self.refresh_url = reverse('token_refresh')
+        self.profile_url = reverse('profile')
+
+    def authenticate(self) -> dict[str, str]:
+        login_response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {
+                    'email': 'john@example.com',
+                    'password': 'TestPass123!',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        return cast(dict[str, str], login_response.data)
+
+    def test_login_returns_access_and_refresh_tokens(self) -> None:
+        response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {
+                    'email': 'john@example.com',
+                    'password': 'TestPass123!',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+
+    def test_refresh_returns_new_access_token(self) -> None:
+        login_data = self.authenticate()
+
+        response = cast(
+            Response,
+            self.client.post(
+                self.refresh_url,
+                {'refresh': login_data['refresh']},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+
+    def test_profile_requires_authentication(self) -> None:
+        response = cast(Response, self.client.get(self.profile_url))
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_profile_can_be_read_and_updated_with_jwt(self) -> None:
+        login_data = self.authenticate()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_data['access']}")
+
+        get_response = cast(Response, self.client.get(self.profile_url))
+        self.assertEqual(get_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(get_response.data, {'phone_number': None, 'address': None})
+
+        patch_response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url,
+                {
+                    'phone_number': '+380000000000',
+                    'address': 'Kyiv',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            patch_response.data,
+            {
+                'phone_number': '+380000000000',
+                'address': 'Kyiv',
+            },
+        )
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.profile.phone_number, '+380000000000')
+        self.assertEqual(self.user.profile.address, 'Kyiv')
