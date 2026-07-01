@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'restaurants',
+    'orders',
     'users',
     'rest_framework_simplejwt',
 ]
