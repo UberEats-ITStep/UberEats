@@ -4,7 +4,7 @@
 
 ### Modern Food Delivery Platform built with Django & React
 
-A full-stack university project focused on building a scalable food delivery platform while applying modern software engineering practices, clean architecture, and AI-driven features.
+A full-stack project focused on building a scalable food delivery platform while applying modern software engineering practices, clean architecture, and AI-driven features.
 
 [![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=green)](https://www.djangoproject.com/)
 [![Django REST Framework](https://img.shields.io/badge/DRF-A30000?style=for-the-badge&logo=django&logoColor=white)](https://www.django-rest-framework.org/)
@@ -20,7 +20,7 @@ A full-stack university project focused on building a scalable food delivery pla
 
 # Project Overview
 
-**UberEats Clone** is a full-stack food delivery platform inspired by Uber Eats and developed as a university software engineering project.
+**UberEats Clone** is a full-stack food delivery platform inspired by Uber Eats and developed as a software engineering project.
 
 The project is designed not only to deliver a working MVP but also to provide hands-on experience with professional backend and frontend development, REST API design, database architecture, authentication, team collaboration, Git workflow, and scalable software architecture.
 
