@@ -193,3 +193,34 @@ class CartApiTests(APITestCase):
         response = cast(Response, self.client.get(url))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_unauthenticated_access(self) -> None:
+        self.client.force_authenticate(user=None)
+        response = cast(Response, self.client.get(self.url))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_unauthorized_access(self) -> None:
+        user2 = UserModel.objects.create_user(username="jane", email="jane@example.com", password="pwd")
+        self.client.force_authenticate(user2)
+        url = reverse("cart-detail", args=[self.cart.id])
+        response = cast(Response, self.client.get(url))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_patch_quantity(self) -> None:
+        item = CartItem.objects.create(cart=self.cart, menu_item=self.burger, quantity=1)
+        url = reverse("cartitem-detail", args=[item.id])
+        response = cast(Response, self.client.patch(url, {"quantity": 5}, format="json"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, 5)
+
+    def test_duplicate_item_increases_quantity(self) -> None:
+        CartItem.objects.create(cart=self.cart, menu_item=self.burger, quantity=1)
+        response = cast(Response, self.client.post(self.url, {
+            "cart": self.cart.id,
+            "menu_item": self.burger.id,
+            "quantity": 2
+        }, format="json"))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.cart.items.count(), 1)
+        self.assertEqual(self.cart.items.first().quantity, 3)
