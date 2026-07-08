@@ -19,6 +19,17 @@ class CartItemSerializer(serializers.ModelSerializer):
         # Remove UniqueTogetherValidator to allow custom aggregation logic in create()
         validators = []
 
+    def validate_cart(self, value):
+        request = self.context.get("request")
+        if request and value.user != request.user:
+            raise serializers.ValidationError("You do not have permission to modify this cart.")
+        return value
+
+    def validate_quantity(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Quantity must be at least 1.")
+        return value
+
     def validate(self, attrs):
         cart = attrs.get("cart", self.instance.cart if self.instance else None)
         menu_item = attrs.get("menu_item", self.instance.menu_item if self.instance else None)
