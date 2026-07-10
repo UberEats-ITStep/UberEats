@@ -25,7 +25,7 @@ The restaurants app now aligns its core data model with the shared schema:
 
 - `cuisines` are standalone and referenced by `restaurants.cuisine`
 - `categories` are global and reused by `menu_items`
-- restaurant detail responses expose both a flat `menu_items` list and a derived `categories` grouping for read convenience
+- restaurant detail responses group `menu_items` cleanly inside their respective `categories`
 
 Useful commands:
 

@@ -72,7 +72,6 @@ RestaurantSerializer = RestaurantListSerializer
 
 class RestaurantDetailSerializer(serializers.ModelSerializer):
     cuisine_name = serializers.CharField(source="cuisine.name", read_only=True)
-    menu_items = RestaurantMenuItemSerializer(many=True, read_only=True)
     categories = serializers.SerializerMethodField()
 
     def get_categories(self, obj):
@@ -108,5 +107,4 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
             "rating",
             "delivery_time",
             "categories",
-            "menu_items",
         )

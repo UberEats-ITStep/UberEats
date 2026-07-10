@@ -87,7 +87,6 @@ class RestaurantSerializerTests(TestCase):
                 }
             ],
         )
-        self.assertEqual(data["menu_items"][0]["name"], "Salmon Roll")
         self.assertNotIn(drinks.id, [category["id"] for category in data["categories"]])
 
 
@@ -204,7 +203,6 @@ class RestaurantApiTests(APITestCase):
                 "rating": "4.70",
                 "delivery_time": 35,
                 "categories": [],
-                "menu_items": [],
             },
         )
 
