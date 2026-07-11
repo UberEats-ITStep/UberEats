@@ -6,18 +6,18 @@ from restaurants.models import MenuItem
 
 class Order(models.Model):
     STATUS_PENDING = 'Pending'
-    STATUS_CONFIRMED = 'Confirmed'
     STATUS_PREPARING = 'Preparing'
+    STATUS_READY = 'Ready'
     STATUS_DELIVERING = 'Delivering'
-    STATUS_DELIVERED = 'Delivered'
+    STATUS_COMPLETED = 'Completed'
     STATUS_CANCELLED = 'Cancelled'
 
     STATUS_CHOICES = (
         (STATUS_PENDING, 'Pending'),
-        (STATUS_CONFIRMED, 'Confirmed'),
         (STATUS_PREPARING, 'Preparing'),
+        (STATUS_READY, 'Ready'),
         (STATUS_DELIVERING, 'Delivering'),
-        (STATUS_DELIVERED, 'Delivered'),
+        (STATUS_COMPLETED, 'Completed'),
         (STATUS_CANCELLED, 'Cancelled'),
     )
 

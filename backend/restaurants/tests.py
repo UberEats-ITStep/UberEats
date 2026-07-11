@@ -8,7 +8,13 @@ from .models import Category, MenuItem, Restaurant
 
 class RestaurantModelTests(TestCase):
     def test_restaurant_category_and_menuitem_relationships_work(self):
-        restaurant = Restaurant.objects.create(name='Sushi Place')
+        restaurant = Restaurant.objects.create(
+            name='Sushi Place',
+            description='Fresh sushi and Japanese favourites.',
+            rating=4.8,
+            delivery_time='30-45 min',
+            image='https://example.com/sushi-place.jpg',
+        )
         category = Category.objects.create(restaurant=restaurant, name='Rolls')
         menu_item = MenuItem.objects.create(
             restaurant=restaurant,

@@ -19,6 +19,47 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = ['id', 'status', 'total_price', 'delivery_address', 'created_at', 'items']
 
 
+class OrderHistoryItemSerializer(serializers.ModelSerializer):
+    menuItemId = serializers.IntegerField(source='menu_item_id', read_only=True)
+    name = serializers.CharField(source='menu_item.name', read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'menuItemId', 'name', 'quantity', 'price']
+
+
+class OrderHistorySerializer(serializers.ModelSerializer):
+    restaurantName = serializers.SerializerMethodField()
+    totalPrice = serializers.DecimalField(
+        source='total_price',
+        max_digits=10,
+        decimal_places=2,
+        read_only=True,
+    )
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    itemCount = serializers.SerializerMethodField()
+    items = OrderHistoryItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'restaurantName',
+            'status',
+            'totalPrice',
+            'createdAt',
+            'itemCount',
+            'items',
+        ]
+
+    def get_restaurantName(self, order):
+        first_item = next(iter(order.items.all()), None)
+        return first_item.menu_item.restaurant.name if first_item else None
+
+    def get_itemCount(self, order):
+        return sum(item.quantity for item in order.items.all())
+
+
 class CheckoutItemSerializer(serializers.Serializer):
     menu_item = serializers.PrimaryKeyRelatedField(queryset=MenuItem.objects.all())
     quantity = serializers.IntegerField(min_value=1)
