@@ -1,9 +1,16 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import MaxValueValidator, MinValueValidator
 
 
 class Restaurant(models.Model):
     name = models.CharField(max_length=255)
+    description = models.TextField()
+    rating = models.FloatField(
+        validators=[MinValueValidator(0), MaxValueValidator(5)]
+    )
+    delivery_time = models.CharField(max_length=50)
+    image = models.URLField(max_length=500)
 
 
 class Category(models.Model):

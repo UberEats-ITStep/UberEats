@@ -3,9 +3,24 @@ from .models import Restaurant, Category, MenuItem
 
 
 class RestaurantSerializer(serializers.ModelSerializer):
+    categories = serializers.SlugRelatedField(
+        many=True,
+        read_only=True,
+        slug_field='name'
+    )
+    deliveryTime = serializers.CharField(source='delivery_time')
+
     class Meta:
         model = Restaurant
-        fields = "__all__"
+        fields = (
+            'id',
+            'name',
+            'description',
+            'rating',
+            'deliveryTime',
+            'categories',
+            'image',
+        )
 
 
 class CategorySerializer(serializers.ModelSerializer):

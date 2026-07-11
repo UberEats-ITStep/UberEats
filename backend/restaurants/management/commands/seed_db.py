@@ -67,6 +67,10 @@ class Command(BaseCommand):
         restaurants_data = [
             {
                 "name": "Pizza Paradise",
+                "description": "Wood-fired pizzas, comforting sides, and classic Italian desserts.",
+                "rating": 4.7,
+                "delivery_time": "25-40 min",
+                "image": "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Pizza", "Sides", "Drinks", "Desserts"],
                 "items": {
                     "Pizza": [("Margherita", 12.99), ("Pepperoni", 14.99), ("BBQ Chicken", 16.99), ("Hawaiian", 15.50)],
@@ -77,6 +81,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "Burger Joint",
+                "description": "Juicy burgers, crispy sides, and hand-spun shakes made to order.",
+                "rating": 4.6,
+                "delivery_time": "20-35 min",
+                "image": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Burgers", "Sides", "Drinks", "Shakes"],
                 "items": {
                     "Burgers": [("Classic Cheeseburger", 9.99), ("Bacon Double", 13.99), ("Veggie Burger", 10.99)],
@@ -87,6 +95,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "Sushi World",
+                "description": "Fresh sushi rolls, nigiri, and Japanese favourites prepared daily.",
+                "rating": 4.8,
+                "delivery_time": "30-45 min",
+                "image": "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Sushi Rolls", "Nigiri", "Appetizers", "Drinks"],
                 "items": {
                     "Sushi Rolls": [("California Roll", 6.99), ("Spicy Tuna Roll", 8.99), ("Dragon Roll", 12.99), ("Rainbow Roll", 14.99)],
@@ -97,6 +109,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "Taco Town",
+                "description": "Street-style tacos, filling burritos, and fresh Mexican sides.",
+                "rating": 4.5,
+                "delivery_time": "20-35 min",
+                "image": "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Tacos", "Burritos", "Sides", "Drinks"],
                 "items": {
                     "Tacos": [("Al Pastor Taco", 3.50), ("Carne Asada Taco", 4.00), ("Chicken Taco", 3.50), ("Fish Taco", 4.50)],
@@ -107,6 +123,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "The Green Salad",
+                "description": "Fresh salads, nourishing bowls, and fruit-packed smoothies.",
+                "rating": 4.6,
+                "delivery_time": "15-25 min",
+                "image": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Salads", "Bowls", "Smoothies", "Snacks"],
                 "items": {
                     "Salads": [("Caesar Salad", 9.50), ("Greek Salad", 10.00), ("Cobb Salad", 11.50)],
@@ -117,6 +137,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "Pasta House",
+                "description": "Italian pasta, pizza, and seasonal salads made with simple ingredients.",
+                "rating": 4.7,
+                "delivery_time": "30-45 min",
+                "image": "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Pasta", "Pizza", "Salads", "Drinks"],
                 "items": {
                     "Pasta": [("Spaghetti Carbonara", 14.50), ("Fettuccine Alfredo", 13.50), ("Penne Arrabbiata", 12.00), ("Lasagna", 15.00)],
@@ -127,6 +151,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "Morning Brew",
+                "description": "Specialty coffee, warm pastries, and easy breakfast favourites.",
+                "rating": 4.4,
+                "delivery_time": "15-25 min",
+                "image": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Coffee", "Tea", "Pastries", "Breakfast"],
                 "items": {
                     "Coffee": [("Espresso", 2.50), ("Latte", 4.00), ("Cappuccino", 4.00), ("Cold Brew", 4.50)],
@@ -137,6 +165,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "Steakhouse Grill",
+                "description": "Grilled steaks, hearty sides, and classic desserts for dinner at home.",
+                "rating": 4.9,
+                "delivery_time": "35-50 min",
+                "image": "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Steaks", "Sides", "Desserts", "Drinks"],
                 "items": {
                     "Steaks": [("Ribeye 12oz", 28.00), ("Filet Mignon 8oz", 32.00), ("New York Strip", 26.00)],
@@ -147,6 +179,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "Wok & Roll",
+                "description": "Asian noodle bowls, rice dishes, and shareable starters.",
+                "rating": 4.5,
+                "delivery_time": "25-40 min",
+                "image": "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Noodles", "Rice Dishes", "Appetizers", "Drinks"],
                 "items": {
                     "Noodles": [("Pad Thai", 12.50), ("Lo Mein", 11.00), ("Pho", 13.00), ("Ramen", 14.00)],
@@ -157,6 +193,10 @@ class Command(BaseCommand):
             },
             {
                 "name": "Vegan Haven",
+                "description": "Plant-based comfort food, fresh wraps, and dairy-free desserts.",
+                "rating": 4.6,
+                "delivery_time": "20-35 min",
+                "image": "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=80",
                 "categories": ["Mains", "Wraps", "Sides", "Desserts"],
                 "items": {
                     "Mains": [("Beyond Burger", 13.50), ("Jackfruit BBQ Sandwhich", 12.00), ("Vegan Mac & Cheese", 11.50)],
@@ -172,8 +212,14 @@ class Command(BaseCommand):
         created_items = 0
 
         for r_data in restaurants_data:
-            restaurant, created = Restaurant.objects.get_or_create(
-                name=r_data["name"]
+            restaurant, created = Restaurant.objects.update_or_create(
+                name=r_data["name"],
+                defaults={
+                    "description": r_data["description"],
+                    "rating": r_data["rating"],
+                    "delivery_time": r_data["delivery_time"],
+                    "image": r_data["image"],
+                }
             )
             if created:
                 created_restaurants += 1

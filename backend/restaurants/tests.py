@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.test import TestCase
+from rest_framework.test import APITestCase
 
 from .models import Category, MenuItem, Restaurant
 
@@ -22,3 +23,29 @@ class RestaurantModelTests(TestCase):
         self.assertEqual(menu_item.restaurant, restaurant)
         self.assertEqual(menu_item.category, category)
         self.assertEqual(menu_item.price, Decimal('12.50'))
+
+
+class RestaurantListApiTests(APITestCase):
+    def test_list_returns_the_restaurant_card_contract(self):
+        restaurant = Restaurant.objects.create(
+            name='Sushi Place',
+            description='Fresh rolls and nigiri.',
+            rating=4.8,
+            delivery_time='30-45 min',
+            image='https://example.com/sushi.jpg',
+        )
+        Category.objects.create(restaurant=restaurant, name='Sushi')
+        Category.objects.create(restaurant=restaurant, name='Japanese')
+
+        response = self.client.get('/api/restaurants/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [{
+            'id': restaurant.id,
+            'name': 'Sushi Place',
+            'description': 'Fresh rolls and nigiri.',
+            'rating': 4.8,
+            'deliveryTime': '30-45 min',
+            'categories': ['Sushi', 'Japanese'],
+            'image': 'https://example.com/sushi.jpg',
+        }])
