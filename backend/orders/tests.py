@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from restaurants.models import Category, MenuItem, Restaurant
+from restaurants.models import Category, Cuisine, MenuItem, Restaurant
 
 from cart.models import Cart, CartItem
 from .models import Order, OrderItem
@@ -33,8 +33,9 @@ class OrderCheckoutApiTests(APITestCase):
             role='Admin',
         )
 
-        self.restaurant = Restaurant.objects.create(name='Pizza House')
-        category = Category.objects.create(restaurant=self.restaurant, name='Pizza')
+        self.cuisine = Cuisine.objects.create(name='Italian')
+        self.restaurant = Restaurant.objects.create(name='Pizza House', cuisine=self.cuisine)
+        category = Category.objects.create(name='Pizza')
         self.menu_item = MenuItem.objects.create(
             restaurant=self.restaurant,
             category=category,
