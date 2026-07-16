@@ -19,6 +19,21 @@ python manage.py runserver
 
 The API is at `http://127.0.0.1:8000/api/`.
 
+## Restaurants backend
+
+The restaurants app now aligns its core data model with the shared schema:
+
+- `cuisines` are standalone and referenced by `restaurants.cuisine`
+- `categories` are global and reused by `menu_items`
+- restaurant detail responses group `menu_items` cleanly inside their respective `categories`
+
+Useful commands:
+
+```bash
+python manage.py migrate
+python manage.py test restaurants --keepdb
+```
+
 ## Authentication endpoints
 
 ### Register

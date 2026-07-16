@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import serializers
 
 from restaurants.models import MenuItem
@@ -16,85 +17,59 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'status', 'total_price', 'delivery_address', 'created_at', 'items']
-
-
-class OrderHistoryItemSerializer(serializers.ModelSerializer):
-    menuItemId = serializers.IntegerField(source='menu_item_id', read_only=True)
-    name = serializers.CharField(source='menu_item.name', read_only=True)
-
-    class Meta:
-        model = OrderItem
-        fields = ['id', 'menuItemId', 'name', 'quantity', 'price']
-
-
-class OrderHistorySerializer(serializers.ModelSerializer):
-    restaurantName = serializers.SerializerMethodField()
-    totalPrice = serializers.DecimalField(
-        source='total_price',
-        max_digits=10,
-        decimal_places=2,
-        read_only=True,
-    )
-    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
-    itemCount = serializers.SerializerMethodField()
-    items = OrderHistoryItemSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Order
-        fields = [
-            'id',
-            'restaurantName',
-            'status',
-            'totalPrice',
-            'createdAt',
-            'itemCount',
-            'items',
-        ]
-
-    def get_restaurantName(self, order):
-        first_item = next(iter(order.items.all()), None)
-        return first_item.menu_item.restaurant.name if first_item else None
-
-    def get_itemCount(self, order):
-        return sum(item.quantity for item in order.items.all())
-
-
-class CheckoutItemSerializer(serializers.Serializer):
-    menu_item = serializers.PrimaryKeyRelatedField(queryset=MenuItem.objects.all())
-    quantity = serializers.IntegerField(min_value=1)
+        fields = ['id', 'status', 'total_price', 'delivery_address', 'created_at', 'items', 'restaurant', 'courier']
 
 
 class CheckoutSerializer(serializers.Serializer):
-    items = CheckoutItemSerializer(many=True)
     delivery_address = serializers.CharField(required=False, allow_blank=True)
 
-    def validate_items(self, value):
-        if not value:
-            raise serializers.ValidationError('Order must contain at least one item.')
-        return value
+    def validate(self, attrs):
+        user = self.context['request'].user
+        
+        if not hasattr(user, 'cart') or not user.cart.items.exists():
+            raise serializers.ValidationError({'non_field_errors': 'Your cart is empty.'})
+            
+        items = user.cart.items.select_related('menu_item')
+        restaurant_ids = {item.menu_item.restaurant_id for item in items}
+        if len(restaurant_ids) > 1:
+            raise serializers.ValidationError({'non_field_errors': 'All items must belong to the same restaurant.'})
+            
+        return attrs
 
+    @transaction.atomic
     def create(self, validated_data):
+        user = self.context['request'].user
+        cart = user.cart
+        cart_items = cart.items.select_related('menu_item').all()
+        
+        restaurant = cart_items[0].menu_item.restaurant
+        
         order = Order.objects.create(
-            user=self.context['request'].user,
+            user=user,
+            restaurant=restaurant,
             delivery_address=validated_data.get('delivery_address', ''),
         )
 
         total_price = 0
-        for item in validated_data['items']:
-            menu_item = item['menu_item']
-            quantity = item['quantity']
-
-            total_price += menu_item.price * quantity
-            OrderItem.objects.create(
-                order=order,
-                menu_item=menu_item,
-                quantity=quantity,
-                price=menu_item.price,
+        order_items_to_create = []
+        for item in cart_items:
+            total_price += item.menu_item.price * item.quantity
+            order_items_to_create.append(
+                OrderItem(
+                    order=order,
+                    menu_item=item.menu_item,
+                    quantity=item.quantity,
+                    price=item.menu_item.price,
+                )
             )
 
+        OrderItem.objects.bulk_create(order_items_to_create)
+        
         order.total_price = total_price
         order.save()
+        
+        cart.items.all().delete()
+        
         return order
 
 

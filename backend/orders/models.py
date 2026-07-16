@@ -1,11 +1,12 @@
 from django.conf import settings
 from django.db import models
 
-from restaurants.models import MenuItem
+from restaurants.models import MenuItem, Restaurant
 
 
 class Order(models.Model):
     STATUS_PENDING = 'Pending'
+    STATUS_ACCEPTED = 'Accepted'
     STATUS_PREPARING = 'Preparing'
     STATUS_READY = 'Ready'
     STATUS_DELIVERING = 'Delivering'
@@ -14,6 +15,7 @@ class Order(models.Model):
 
     STATUS_CHOICES = (
         (STATUS_PENDING, 'Pending'),
+        (STATUS_ACCEPTED, 'Accepted'),
         (STATUS_PREPARING, 'Preparing'),
         (STATUS_READY, 'Ready'),
         (STATUS_DELIVERING, 'Delivering'),
@@ -23,6 +25,18 @@ class Order(models.Model):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='orders',
+    )
+    courier = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='deliveries',
+    )
+    restaurant = models.ForeignKey(
+        Restaurant,
         on_delete=models.CASCADE,
         related_name='orders',
     )
