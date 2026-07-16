@@ -3,12 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Order
-from .serializers import (
-    CheckoutSerializer,
-    OrderHistorySerializer,
-    OrderSerializer,
-    OrderStatusSerializer,
-)
+from .serializers import CheckoutSerializer, OrderSerializer, OrderStatusSerializer
 
 
 class CheckoutView(APIView):
@@ -23,14 +18,10 @@ class CheckoutView(APIView):
 
 class OrderHistoryView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = OrderHistorySerializer
+    serializer_class = OrderSerializer
 
     def get_queryset(self):
-        return (
-            Order.objects.filter(user=self.request.user)
-            .prefetch_related('items__menu_item__restaurant')
-            .order_by('-created_at')
-        )
+        return Order.objects.filter(user=self.request.user).prefetch_related('items__menu_item').order_by('-created_at')
 
 
 class OrderStatusView(generics.RetrieveUpdateAPIView):
