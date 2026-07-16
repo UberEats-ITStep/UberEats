@@ -10,7 +10,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
 
-from restaurants.models import Restaurant, Category, MenuItem
+from restaurants.models import Category, Cuisine, MenuItem, Restaurant
 from .models import Cart, CartItem
 
 
@@ -29,12 +29,9 @@ class CartModelTests(TestCase):
             )
         )
 
-        self.restaurant = Restaurant.objects.create(name="McDonalds")
-
-        self.category = Category.objects.create(
-            restaurant=self.restaurant,
-            name="Burgers",
-        )
+        self.cuisine = Cuisine.objects.create(name='American')
+        self.restaurant = Restaurant.objects.create(name="McDonalds", cuisine=self.cuisine)
+        self.category = Category.objects.create(name="Burgers")
 
         self.menu_item = MenuItem.objects.create(
             restaurant=self.restaurant,
@@ -89,16 +86,15 @@ class CartApiTests(APITestCase):
 
         self.cart = Cart.objects.create(user=self.user)
 
-        self.restaurant1 = Restaurant.objects.create(name="McDonalds")
-        self.restaurant2 = Restaurant.objects.create(name="KFC")
+        self.cuisine = Cuisine.objects.create(name='Fast Food')
+        self.restaurant1 = Restaurant.objects.create(name="McDonalds", cuisine=self.cuisine)
+        self.restaurant2 = Restaurant.objects.create(name="KFC", cuisine=self.cuisine)
 
         self.category1 = Category.objects.create(
-            restaurant=self.restaurant1,
-            name="Burgers",
+            name="Burgers1",
         )
 
         self.category2 = Category.objects.create(
-            restaurant=self.restaurant2,
             name="Chicken",
         )
 
