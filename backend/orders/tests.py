@@ -5,8 +5,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from restaurants.models import Category, MenuItem, Restaurant
+from restaurants.models import Category, Cuisine, MenuItem, Restaurant
 
+from cart.models import Cart, CartItem
 from .models import Order, OrderItem
 
 
@@ -32,10 +33,11 @@ class OrderCheckoutApiTests(APITestCase):
             role='Admin',
         )
 
-        restaurant = Restaurant.objects.create(name='Pizza House')
-        category = Category.objects.create(restaurant=restaurant, name='Pizza')
+        self.cuisine = Cuisine.objects.create(name='Italian')
+        self.restaurant = Restaurant.objects.create(name='Pizza House', cuisine=self.cuisine)
+        category = Category.objects.create(name='Pizza')
         self.menu_item = MenuItem.objects.create(
-            restaurant=restaurant,
+            restaurant=self.restaurant,
             category=category,
             name='Margherita',
             price=Decimal('10.50'),
@@ -44,7 +46,7 @@ class OrderCheckoutApiTests(APITestCase):
         self.history_url = reverse('order_history')
 
     def create_order(self, user):
-        order = Order.objects.create(user=user, total_price=self.menu_item.price)
+        order = Order.objects.create(user=user, restaurant=self.restaurant, total_price=self.menu_item.price)
         OrderItem.objects.create(
             order=order,
             menu_item=self.menu_item,
@@ -54,18 +56,15 @@ class OrderCheckoutApiTests(APITestCase):
         return order
 
     def test_checkout_creates_order(self):
+        cart, _ = Cart.objects.get_or_create(user=self.user)
+        CartItem.objects.create(cart=cart, menu_item=self.menu_item, quantity=2)
+
         self.client.force_authenticate(user=self.user)
 
         response = self.client.post(
             self.checkout_url,
             {
                 'delivery_address': 'Kyiv, Main street 1',
-                'items': [
-                    {
-                        'menu_item': self.menu_item.id,
-                        'quantity': 2,
-                    },
-                ],
             },
             format='json',
         )
@@ -73,25 +72,29 @@ class OrderCheckoutApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Order.objects.count(), 1)
         self.assertEqual(OrderItem.objects.count(), 1)
+        self.assertEqual(CartItem.objects.filter(cart=cart).count(), 0)
 
         order = Order.objects.get()
         self.assertEqual(order.user, self.user)
+        self.assertEqual(order.restaurant, self.restaurant)
         self.assertEqual(order.status, Order.STATUS_PENDING)
         self.assertEqual(order.total_price, Decimal('21.00'))
         self.assertEqual(response.data['total_price'], '21.00')
 
     def test_checkout_rejects_empty_items(self):
+        Cart.objects.get_or_create(user=self.user)
         self.client.force_authenticate(user=self.user)
 
         response = self.client.post(
             self.checkout_url,
             {
-                'items': [],
+                'delivery_address': 'Kyiv, Main street 1',
             },
             format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['non_field_errors'][0], 'Your cart is empty.')
         self.assertEqual(Order.objects.count(), 0)
 
     def test_order_history_returns_user_orders(self):
@@ -120,7 +123,7 @@ class OrderCheckoutApiTests(APITestCase):
 
         response = self.client.patch(
             reverse('order_status', args=[order.id]),
-            {'status': Order.STATUS_CONFIRMED},
+            {'status': Order.STATUS_ACCEPTED},
             format='json',
         )
 
@@ -134,10 +137,10 @@ class OrderCheckoutApiTests(APITestCase):
 
         response = self.client.patch(
             reverse('order_status', args=[order.id]),
-            {'status': Order.STATUS_CONFIRMED},
+            {'status': Order.STATUS_ACCEPTED},
             format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         order.refresh_from_db()
-        self.assertEqual(order.status, Order.STATUS_CONFIRMED)
+        self.assertEqual(order.status, Order.STATUS_ACCEPTED)
