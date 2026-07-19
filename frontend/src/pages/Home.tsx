@@ -54,12 +54,14 @@ const Home: FC = () => {
   };
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const filteredRestaurants = restaurants.filter((restaurant) => {
+  const filteredRestaurants = restaurants.filter((r) => {
+    const restaurant = r as Restaurant & { cuisine_name?: string };
     const query = normalizedSearchQuery;
     return (
-      restaurant.name.toLowerCase().includes(query) ||
-      restaurant.description.toLowerCase().includes(query) ||
-      restaurant.categories.some(category => category.toLowerCase().includes(query))
+      (restaurant.name || '').toLowerCase().includes(query) ||
+      (restaurant.description || '').toLowerCase().includes(query) ||
+      (restaurant.categories && restaurant.categories.some(category => category.toLowerCase().includes(query))) ||
+      (restaurant.cuisine_name && restaurant.cuisine_name.toLowerCase().includes(query))
     );
   });
   const hasSearchQuery = normalizedSearchQuery.length > 0;
