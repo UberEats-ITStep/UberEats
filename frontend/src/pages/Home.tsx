@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import type { FC, ChangeEvent } from 'react';
 import RestaurantCard from '../features/restaurants/components/RestaurantCard';
 import { restaurantService } from '../features/restaurants/api/restaurant.service';
@@ -54,14 +54,18 @@ const Home: FC = () => {
   };
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const filteredRestaurants = restaurants.filter((restaurant) => {
+  
+  const filteredRestaurants = useMemo(() => {
     const query = normalizedSearchQuery;
-    return (
-      restaurant.name.toLowerCase().includes(query) ||
-      restaurant.description.toLowerCase().includes(query) ||
-      restaurant.categories.some(category => category.toLowerCase().includes(query))
-    );
-  });
+    if (!query) return restaurants;
+    return restaurants.filter((restaurant) => {
+      return (
+        restaurant.name.toLowerCase().includes(query) ||
+        restaurant.description.toLowerCase().includes(query) ||
+        (restaurant.cuisine_name && restaurant.cuisine_name.toLowerCase().includes(query))
+      );
+    });
+  }, [restaurants, normalizedSearchQuery]);
   const hasSearchQuery = normalizedSearchQuery.length > 0;
 
   return (

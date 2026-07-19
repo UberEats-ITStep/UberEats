@@ -3,7 +3,7 @@ export interface Restaurant {
   name: string;
   description: string;
   rating: number;
-  deliveryTime: string;
-  categories: string[];
-  image: string;
+  delivery_time: number;
+  cuisine_name: string;
+  image_url: string;
 }
