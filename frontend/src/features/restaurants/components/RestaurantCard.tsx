@@ -11,14 +11,16 @@ const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
       {/* Image container with fixed aspect ratio */}
       <div className="relative h-48 w-full overflow-hidden bg-gray-200">
         <img
-          src={restaurant.image}
+          src={restaurant.image_url}
           alt={restaurant.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
         {/* Delivery Time Badge */}
-        <div className="absolute bottom-3 right-3 bg-white px-2 py-1 rounded-full text-xs font-semibold text-gray-800 shadow-sm">
-          {restaurant.deliveryTime}
-        </div>
+        {restaurant.delivery_time != null && (
+          <div className="absolute bottom-3 right-3 bg-white px-2 py-1 rounded-full text-xs font-semibold text-gray-800 shadow-sm">
+            {restaurant.delivery_time} min
+          </div>
+        )}
       </div>
 
       <div className="p-4">
@@ -37,10 +39,9 @@ const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
         <div className="flex flex-wrap gap-2">
           {restaurant.categories ? restaurant.categories.map((category) => (
             <span
-              key={category}
               className="inline-block px-2 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded border border-gray-200"
             >
-              {category}
+              {restaurant.cuisine_name}
             </span>
           )) : (restaurant as Restaurant & { cuisine_name?: string }).cuisine_name ? (
             <span className="inline-block px-2 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded border border-gray-200">
