@@ -79,7 +79,7 @@ class RegisterApiTests(APITestCase):
                 {
                     'email': 'test.user@example.com',
                     'password': 'TestPass123!',
-                    'role': 'Client',
+                    'role': 'CLIENT',
                 },
                 format='json',
             ),
@@ -87,7 +87,7 @@ class RegisterApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['email'], 'test.user@example.com')
-        self.assertEqual(response.data['role'], 'Client')
+        self.assertEqual(response.data['role'], 'CLIENT')
 
         user = cast(Any, UserModel.objects.get(email='test.user@example.com'))
         self.assertEqual(user.username, 'test.user1')
@@ -101,7 +101,7 @@ class RegisterApiTests(APITestCase):
                 {
                     'email': 'profile@example.com',
                     'password': 'TestPass123!',
-                    'role': 'Client',
+                    'role': 'CLIENT',
                     'phone_number': '+380000000000',
                     'address': 'Kyiv',
                 },
@@ -128,7 +128,7 @@ class RegisterApiTests(APITestCase):
                 {
                     'email': 'existing@example.com',
                     'password': 'TestPass123!',
-                    'role': 'Client',
+                    'role': 'CLIENT',
                 },
                 format='json',
             ),
@@ -146,7 +146,7 @@ class JwtAuthApiTests(APITestCase):
                 username='john',
                 email='john@example.com',
                 password='TestPass123!',
-                role='Client',
+                role='CLIENT',
             ),
         )
         self.login_url = reverse('login')

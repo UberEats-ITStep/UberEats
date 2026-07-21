@@ -35,13 +35,10 @@ class CartItemSerializer(serializers.ModelSerializer):
         menu_item = attrs.get("menu_item", self.instance.menu_item if self.instance else None)
 
         if cart and menu_item:
-            items = cart.items.select_related("menu_item")
-            if items.exists():
-                restaurant = items.first().menu_item.restaurant
-                if menu_item.restaurant != restaurant:
-                    raise serializers.ValidationError(
-                        "Cart can contain items from only one restaurant."
-                    )
+            if cart.restaurant and menu_item.restaurant != cart.restaurant:
+                raise serializers.ValidationError(
+                    "Cart can contain items from only one restaurant."
+                )
         return attrs
 
     def create(self, validated_data):
@@ -58,6 +55,10 @@ class CartItemSerializer(serializers.ModelSerializer):
         if not created:
             item.quantity += quantity
             item.save()
+
+        if not cart.restaurant:
+            cart.restaurant = menu_item.restaurant
+            cart.save()
 
         return item
 

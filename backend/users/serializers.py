@@ -42,7 +42,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             username=username,
             email=email,
             password=validated_data['password'],
-            role=validated_data.get('role', 'Client')
+            role=validated_data.get('role', 'CLIENT')
         )
         user.profile.phone_number = phone_number or None
         user.profile.address = address or None

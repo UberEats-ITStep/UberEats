@@ -5,12 +5,12 @@ from django.dispatch import receiver
 
 class User(AbstractUser):
     ROLE_CHOICES = (
-        ('Client', 'Client'),
-        ('Courier', 'Courier'),
-        ('Admin', 'Admin'),
+        ('CLIENT', 'CLIENT'),
+        ('COURIER', 'COURIER'),
+        ('ADMIN', 'ADMIN'),
     )
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Client')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='CLIENT')
     created_at = models.DateTimeField(auto_now_add=True)
     
     # Require email for authentication
