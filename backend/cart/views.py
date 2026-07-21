@@ -10,7 +10,7 @@ class CartViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Cart.objects.filter(user=self.request.user).prefetch_related("items__menu_item")
+        return Cart.objects.filter(user=self.request.user).select_related("restaurant").prefetch_related("items__menu_item")
 
 
 class CartItemViewSet(viewsets.ModelViewSet):

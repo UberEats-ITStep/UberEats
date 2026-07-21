@@ -45,7 +45,7 @@ class CheckoutSerializer(serializers.Serializer):
         restaurant = cart_items[0].menu_item.restaurant
         
         order = Order.objects.create(
-            user=user,
+            client=user,
             restaurant=restaurant,
             delivery_address=validated_data.get('delivery_address', ''),
         )

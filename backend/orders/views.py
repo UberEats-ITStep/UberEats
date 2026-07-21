@@ -21,7 +21,7 @@ class OrderHistoryView(generics.ListAPIView):
     serializer_class = OrderSerializer
 
     def get_queryset(self):
-        return Order.objects.filter(user=self.request.user).prefetch_related('items__menu_item').order_by('-created_at')
+        return Order.objects.filter(client=self.request.user).prefetch_related('items__menu_item').order_by('-created_at')
 
 
 class OrderStatusView(generics.RetrieveUpdateAPIView):
@@ -30,12 +30,12 @@ class OrderStatusView(generics.RetrieveUpdateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff or getattr(user, 'role', None) == 'Admin':
+        if user.is_staff or getattr(user, 'role', None) == 'ADMIN':
             return Order.objects.all()
-        return Order.objects.filter(user=user)
+        return Order.objects.filter(client=user)
 
     def update(self, request, *args, **kwargs):
         user = request.user
-        if not user.is_staff and getattr(user, 'role', None) != 'Admin':
+        if not user.is_staff and getattr(user, 'role', None) != 'ADMIN':
             return Response({'detail': 'Only admins can update order status.'}, status=status.HTTP_403_FORBIDDEN)
         return super().update(request, *args, **kwargs)
