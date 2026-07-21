@@ -144,3 +144,4 @@ class OrderCheckoutApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         order.refresh_from_db()
         self.assertEqual(order.status, Order.STATUS_ACCEPTED)
+        

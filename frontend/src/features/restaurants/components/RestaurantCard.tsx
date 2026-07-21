@@ -37,13 +37,17 @@ const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
         <p className="text-sm text-gray-500 mb-3 line-clamp-2">{restaurant.description}</p>
 
         <div className="flex flex-wrap gap-2">
-          {restaurant.cuisine_name && (
+          {restaurant.categories ? restaurant.categories.map((category) => (
             <span
               className="inline-block px-2 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded border border-gray-200"
             >
               {restaurant.cuisine_name}
             </span>
-          )}
+          )) : (restaurant as Restaurant & { cuisine_name?: string }).cuisine_name ? (
+            <span className="inline-block px-2 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded border border-gray-200">
+              {(restaurant as Restaurant & { cuisine_name?: string }).cuisine_name}
+            </span>
+          ) : null}
         </div>
       </div>
     </div>
