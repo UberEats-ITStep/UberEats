@@ -1,12 +1,77 @@
+from django.core.validators import RegexValidator
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
 from .models import User, Profile
 
+
+PHONE_NUMBER_VALIDATOR = RegexValidator(
+    regex=r'^\+[1-9]\d{7,14}$',
+    message=(
+        'Enter a valid phone number in international format, '
+        'for example +380501234567.'
+    ),
+)
+
+
 class ProfileSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='user.id', read_only=True)
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.EmailField(source='user.email')
+    first_name = serializers.CharField(
+        source='user.first_name', max_length=150, required=False, allow_blank=True
+    )
+    last_name = serializers.CharField(
+        source='user.last_name', max_length=150, required=False, allow_blank=True
+    )
+    role = serializers.CharField(source='user.role', read_only=True)
+    created_at = serializers.DateTimeField(source='user.created_at', read_only=True)
+    phone_number = serializers.CharField(
+        max_length=16,
+        required=False,
+        validators=[PHONE_NUMBER_VALIDATOR],
+    )
+    address = serializers.CharField(
+        max_length=500,
+        required=False,
+    )
+
     class Meta:
         model = Profile
-        fields = ['phone_number', 'address']
+        fields = [
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'role',
+            'created_at',
+            'phone_number',
+            'address',
+        ]
+
+    def validate_email(self, value):
+        email = value.lower()
+        queryset = User.objects.filter(email__iexact=email)
+        if self.instance is not None:
+            queryset = queryset.exclude(pk=self.instance.user_id)
+        if queryset.exists():
+            raise serializers.ValidationError('A user with this email already exists.')
+        return email
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        # User and Profile are separate tables. If either save fails, roll back both.
+        user_data = validated_data.pop('user', {})
+        for field, value in user_data.items():
+            setattr(instance.user, field, value)
+        if user_data:
+            instance.user.save(update_fields=list(user_data))
+
+        return super().update(instance, validated_data)
+
 
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)
@@ -15,10 +80,22 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'role', 'created_at', 'profile']
 
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
-    phone_number = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    address = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    phone_number = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        max_length=16,
+        validators=[PHONE_NUMBER_VALIDATOR],
+    )
+    address = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        max_length=500,
+    )
 
     class Meta:
         model = User
