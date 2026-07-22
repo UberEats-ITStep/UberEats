@@ -44,11 +44,15 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
+    'rest_framework_simplejwt',
+
+    # --- APPS ---
     'restaurants',
     'orders',
     'users',
-    'rest_framework_simplejwt',
-    'cart'
+    'cart',
+    'reviews',
+    'django_filters',
 ]
 
 MIDDLEWARE = [

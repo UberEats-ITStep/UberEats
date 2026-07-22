@@ -28,8 +28,19 @@ class Restaurant(models.Model):
         related_name="restaurants",
     )
     rating = models.DecimalField(max_digits=3, decimal_places=2, null=True, blank=True)
+    review_count = models.PositiveIntegerField(default=0)
     delivery_time = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def update_rating(self):
+        from django.db.models import Avg, Count
+        aggregation = self.reviews.aggregate(
+            avg_rating=Avg('rating'),
+            total_reviews=Count('id')
+        )
+        self.rating = aggregation['avg_rating']
+        self.review_count = aggregation['total_reviews']
+        self.save(update_fields=['rating', 'review_count'])
 
     def __str__(self) -> str:
         return self.name
