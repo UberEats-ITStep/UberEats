@@ -114,6 +114,24 @@ class RegisterApiTests(APITestCase):
         self.assertEqual(user.profile.phone_number, '+380000000000')
         self.assertEqual(user.profile.address, 'Kyiv')
 
+    def test_register_rejects_invalid_phone_number(self) -> None:
+        response = cast(
+            Response,
+            self.client.post(
+                self.url,
+                {
+                    'email': 'invalid-phone@example.com',
+                    'password': 'TestPass123!',
+                    'phone_number': '050-123',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('international format', str(response.data['phone_number'][0]))
+        self.assertFalse(UserModel.objects.filter(email='invalid-phone@example.com').exists())
+
     def test_register_existing_email_returns_clear_error(self) -> None:
         UserModel.objects.create_user(
             username='existing',
@@ -238,19 +256,37 @@ class JwtAuthApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_profile_update_requires_authentication(self) -> None:
+        response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url, {'address': 'Kyiv'}, format='json'
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.user.profile.refresh_from_db()
+        self.assertIsNone(self.user.profile.address)
+
     def test_profile_can_be_read_and_updated_with_jwt(self) -> None:
         login_data = self.authenticate()
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_data['access']}")
 
         get_response = cast(Response, self.client.get(self.profile_url))
         self.assertEqual(get_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(get_response.data, {'phone_number': None, 'address': None})
+        self.assertEqual(get_response.data['id'], self.user.id)
+        self.assertEqual(get_response.data['email'], 'john@example.com')
+        self.assertEqual(get_response.data['role'], 'CLIENT')
+        self.assertIsNone(get_response.data['phone_number'])
+        self.assertIsNone(get_response.data['address'])
 
         patch_response = cast(
             Response,
             self.client.patch(
                 self.profile_url,
                 {
+                    'first_name': 'John',
+                    'last_name': 'Doe',
                     'phone_number': '+380000000000',
                     'address': 'Kyiv',
                 },
@@ -259,14 +295,117 @@ class JwtAuthApiTests(APITestCase):
         )
 
         self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            patch_response.data,
-            {
-                'phone_number': '+380000000000',
-                'address': 'Kyiv',
-            },
-        )
+        self.assertEqual(patch_response.data['first_name'], 'John')
+        self.assertEqual(patch_response.data['last_name'], 'Doe')
+        self.assertEqual(patch_response.data['phone_number'], '+380000000000')
+        self.assertEqual(patch_response.data['address'], 'Kyiv')
 
         self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'John')
+        self.assertEqual(self.user.last_name, 'Doe')
         self.assertEqual(self.user.profile.phone_number, '+380000000000')
+        self.assertEqual(self.user.profile.address, 'Kyiv')
+
+    def test_profile_rejects_invalid_phone_number_with_clear_error(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url, {'phone_number': '050-123'}, format='json'
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('international format', str(response.data['phone_number'][0]))
+
+    def test_profile_rejects_blank_delivery_fields(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url,
+                {'phone_number': '', 'address': ''},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(str(response.data['phone_number'][0]), 'This field may not be blank.')
+        self.assertEqual(str(response.data['address'][0]), 'This field may not be blank.')
+
+    def test_full_profile_update_reports_missing_required_email(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.put(
+                self.profile_url, {'first_name': 'John'}, format='json'
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(str(response.data['email'][0]), 'This field is required.')
+
+    def test_profile_rejects_duplicate_email(self) -> None:
+        UserModel.objects.create_user(
+            username='jane',
+            email='jane@example.com',
+            password='TestPass123!',
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url, {'email': 'JANE@example.com'}, format='json'
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('already exists', str(response.data['email'][0]))
+
+    def test_profile_does_not_allow_identity_or_role_changes(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url,
+                {'id': 999, 'username': 'hacker', 'role': 'ADMIN'},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertNotEqual(self.user.id, 999)
+        self.assertEqual(self.user.username, 'john')
+        self.assertEqual(self.user.role, 'CLIENT')
+
+    def test_profile_endpoint_always_uses_authenticated_users_profile(self) -> None:
+        other_user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='jane',
+                email='jane@example.com',
+                password='TestPass123!',
+            ),
+        )
+        other_user.profile.address = 'Lviv'
+        other_user.profile.save()
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url, {'address': 'Kyiv'}, format='json'
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        other_user.profile.refresh_from_db()
+        self.user.profile.refresh_from_db()
+        self.assertEqual(other_user.profile.address, 'Lviv')
         self.assertEqual(self.user.profile.address, 'Kyiv')
