@@ -139,6 +139,7 @@ class RestaurantApiTests(APITestCase):
                     "cuisine": sushi.cuisine_id,
                     "cuisine_name": "Japanese",
                     "rating": "4.70",
+                    "review_count": 0,
                     "delivery_time": 35,
                 },
                 {
@@ -152,6 +153,7 @@ class RestaurantApiTests(APITestCase):
                     "cuisine": burger.cuisine_id,
                     "cuisine_name": "Japanese",
                     "rating": "4.70",
+                    "review_count": 0,
                     "delivery_time": 35,
                 },
             ],
@@ -201,6 +203,7 @@ class RestaurantApiTests(APITestCase):
                 "cuisine": restaurant.cuisine_id,
                 "cuisine_name": "Japanese",
                 "rating": "4.70",
+                "review_count": 0,
                 "delivery_time": 35,
                 "categories": [],
             },

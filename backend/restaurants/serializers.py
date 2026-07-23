@@ -63,6 +63,7 @@ class RestaurantListSerializer(serializers.ModelSerializer):
             "cuisine",
             "cuisine_name",
             "rating",
+            "review_count",
             "delivery_time",
         )
 
@@ -105,6 +106,7 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
             "cuisine",
             "cuisine_name",
             "rating",
+            "review_count",
             "delivery_time",
             "categories",
         )
