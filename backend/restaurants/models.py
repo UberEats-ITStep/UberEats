@@ -41,6 +41,7 @@ class Restaurant(models.Model):
         max_digits=3, decimal_places=2, null=True, blank=True,
         validators=[MinValueValidator(0), MaxValueValidator(5)],
     )
+    review_count = models.PositiveIntegerField(default=0)
     delivery_time = models.PositiveIntegerField(
         null=True, blank=True,
         validators=[MinValueValidator(1)],
@@ -58,10 +59,20 @@ class Restaurant(models.Model):
         time = timezone.localtime()
         is_weekend = time.weekday() >= 5  # 5=субота, 6=неділя
         day_type = "weekend" if is_weekend else "weekday"
-        hours = self.opening_hours.filter(day_type=day_type).first()
+        hours = next((h for h in self.opening_hours.all() if h.day_type == day_type), None)
         if hours is None:
             return False
         return hours.opens_at <= time.time() <= hours.closes_at
+
+    def update_rating(self):
+        from django.db.models import Avg, Count
+        aggregation = self.reviews.aggregate(
+            avg_rating=Avg('rating'),
+            total_reviews=Count('id')
+        )
+        self.rating = aggregation['avg_rating']
+        self.review_count = aggregation['total_reviews']
+        self.save(update_fields=['rating', 'review_count'])
 
     def __str__(self) -> str:
         return self.name

@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from restaurants.models import Category, MenuItem, Restaurant
+from restaurants.models import Category, Cuisine, MenuItem, Restaurant
 
 from cart.models import Cart, CartItem
 from .models import Order, OrderItem
@@ -33,8 +33,9 @@ class OrderCheckoutApiTests(APITestCase):
             role='Admin',
         )
 
-        self.restaurant = Restaurant.objects.create(name='Pizza House')
-        category = Category.objects.create(restaurant=self.restaurant, name='Pizza')
+        self.cuisine = Cuisine.objects.create(name='Italian')
+        self.restaurant = Restaurant.objects.create(name='Pizza House', cuisine=self.cuisine)
+        category = Category.objects.create(name='Pizza')
         self.menu_item = MenuItem.objects.create(
             restaurant=self.restaurant,
             category=category,
@@ -45,7 +46,7 @@ class OrderCheckoutApiTests(APITestCase):
         self.history_url = reverse('order_history')
 
     def create_order(self, user):
-        order = Order.objects.create(user=user, restaurant=self.restaurant, total_price=self.menu_item.price)
+        order = Order.objects.create(client=user, restaurant=self.restaurant, total_price=self.menu_item.price)
         OrderItem.objects.create(
             order=order,
             menu_item=self.menu_item,
@@ -74,7 +75,7 @@ class OrderCheckoutApiTests(APITestCase):
         self.assertEqual(CartItem.objects.filter(cart=cart).count(), 0)
 
         order = Order.objects.get()
-        self.assertEqual(order.user, self.user)
+        self.assertEqual(order.client, self.user)
         self.assertEqual(order.restaurant, self.restaurant)
         self.assertEqual(order.status, Order.STATUS_PENDING)
         self.assertEqual(order.total_price, Decimal('21.00'))
@@ -143,3 +144,4 @@ class OrderCheckoutApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         order.refresh_from_db()
         self.assertEqual(order.status, Order.STATUS_ACCEPTED)
+        
