@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Link } from 'react-router-dom';
 import type { Restaurant } from '../types/restaurant.types';
 
 interface RestaurantCardProps {
@@ -7,7 +8,11 @@ interface RestaurantCardProps {
 
 const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
   return (
-    <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden border border-gray-100 group cursor-pointer">
+    <Link
+      to={`/restaurants/${restaurant.id}`}
+      className="block bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden border border-gray-100 group focus:outline-none focus:ring-2 focus:ring-[#FF8C00] focus:ring-offset-2"
+      aria-label={`View ${restaurant.name} menu`}
+    >
       {/* Image container with fixed aspect ratio */}
       <div className="relative h-48 w-full overflow-hidden bg-gray-200">
         <img
@@ -37,20 +42,14 @@ const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
         <p className="text-sm text-gray-500 mb-3 line-clamp-2">{restaurant.description}</p>
 
         <div className="flex flex-wrap gap-2">
-          {restaurant.categories ? restaurant.categories.map((category) => (
-            <span
-              className="inline-block px-2 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded border border-gray-200"
-            >
-              {restaurant.cuisine_name}
-            </span>
-          )) : (restaurant as Restaurant & { cuisine_name?: string }).cuisine_name ? (
+          {restaurant.cuisine_name ? (
             <span className="inline-block px-2 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded border border-gray-200">
-              {(restaurant as Restaurant & { cuisine_name?: string }).cuisine_name}
+              {restaurant.cuisine_name}
             </span>
           ) : null}
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

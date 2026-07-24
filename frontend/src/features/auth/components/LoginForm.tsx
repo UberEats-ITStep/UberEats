@@ -52,7 +52,7 @@ const LoginForm: FC = () => {
 
     try {
       await login(formData);
-      navigate('/profile', { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       setRequestError(getAuthError(error, 'Unable to sign in. Please try again.'));
     } finally {

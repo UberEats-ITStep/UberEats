@@ -55,13 +55,11 @@ const Home: FC = () => {
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredRestaurants = restaurants.filter((r) => {
-    const restaurant = r as Restaurant & { cuisine_name?: string };
     const query = normalizedSearchQuery;
     return (
-      (restaurant.name || '').toLowerCase().includes(query) ||
-      (restaurant.description || '').toLowerCase().includes(query) ||
-      (restaurant.categories && restaurant.categories.some(category => category.toLowerCase().includes(query))) ||
-      (restaurant.cuisine_name && restaurant.cuisine_name.toLowerCase().includes(query))
+      (r.name || '').toLowerCase().includes(query) ||
+      (r.description || '').toLowerCase().includes(query) ||
+      (r.cuisine_name || '').toLowerCase().includes(query)
     );
   });
   const hasSearchQuery = normalizedSearchQuery.length > 0;
@@ -82,7 +80,8 @@ const Home: FC = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center max-w-xl mx-auto space-y-3 sm:space-y-0 sm:space-x-3">
             <input
               type="text"
-              placeholder="Search for restaurants, cuisines, or dishes"
+              placeholder="Search restaurants or cuisines"
+              aria-label="Search restaurants or cuisines"
               value={searchQuery}
               onChange={handleSearchChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 text-center"

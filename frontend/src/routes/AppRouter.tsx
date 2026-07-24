@@ -1,12 +1,13 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
-import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import NotFound from '../pages/NotFound';
 import OrderHistory from '../pages/OrderHistory';
 import Profile from '../pages/Profile';
+import RestaurantDetails from '../pages/RestaurantDetails';
+import IndexRoute from './IndexRoute';
 import ProtectedRoute from './ProtectedRoute';
 
 const AppRouter: React.FC = () => {
@@ -15,7 +16,8 @@ const AppRouter: React.FC = () => {
       <Routes>
         <Route element={<MainLayout />}>
           {/* Public Routes */}
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<IndexRoute />} />
+          <Route path="/restaurants/:restaurantId" element={<RestaurantDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 

@@ -14,7 +14,7 @@ export interface LoginCredentials {
 }
 
 export interface RegisterCredentials extends LoginCredentials {
-  role: 'Client';
+  role: 'CLIENT';
   phone_number?: string;
   address?: string;
 }
