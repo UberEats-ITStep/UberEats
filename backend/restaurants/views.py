@@ -15,7 +15,7 @@ class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = RestaurantListSerializer
 
     def get_queryset(self):
-        queryset = Restaurant.objects.order_by("id").select_related("cuisine")
+        queryset = Restaurant.objects.order_by("id").select_related("cuisine").prefetch_related("opening_hours")
 
         if self.action == "retrieve":
             return queryset.prefetch_related(
