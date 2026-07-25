@@ -23,6 +23,7 @@ from rest_framework.reverse import reverse
 
 from restaurants.urls import register_routes as register_restaurants_routes
 from cart.urls import register_routes as register_cart_routes
+from favorites.urls import register_routes as register_favorites_routes
 from reviews.urls import register_routes as register_reviews_routes
 
 class CustomAPIRootView(APIRootView):
@@ -48,6 +49,7 @@ router = GlobalRouter()
 
 register_restaurants_routes(router)
 register_cart_routes(router)
+register_favorites_routes(router)
 register_reviews_routes(router)
 
 urlpatterns = [

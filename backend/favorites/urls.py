@@ -1,8 +1,8 @@
-# urls.py
-from rest_framework.routers import DefaultRouter
-from .views import FavoriteCRUD
+from .views import FavoriteViewSet
 
-router = DefaultRouter()
-router.register("favorites", FavoriteCRUD, basename="favorite")
 
-urlpatterns = router.urls
+def register_routes(router):
+    router.register("favorites", FavoriteViewSet, basename="favorite")
+
+
+urlpatterns = []
