@@ -1,21 +1,14 @@
-import type { FC } from 'react';
+import type { FC, ReactNode } from 'react';
 import type { MenuItem } from '../types/restaurant.types';
+import { formatPrice } from '../../../utils/currency';
 
-interface MenuItemCardProps {
+export interface MenuItemCardProps {
   item: MenuItem;
+  onAddToCart?: (item: MenuItem) => void;
+  actionSlot?: ReactNode;
 }
 
-const formatPrice = (price: string) => {
-  const numericPrice = Number(price);
-  return Number.isFinite(numericPrice)
-    ? new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-      }).format(numericPrice)
-    : price;
-};
-
-const MenuItemCard: FC<MenuItemCardProps> = ({ item }) => (
+const MenuItemCard: FC<MenuItemCardProps> = ({ item, onAddToCart, actionSlot }) => (
   <article
     className={`flex min-h-44 overflow-hidden rounded-2xl border bg-white shadow-sm transition-shadow hover:shadow-md ${
       item.is_available ? 'border-gray-200' : 'border-gray-200 opacity-70'
@@ -31,11 +24,27 @@ const MenuItemCard: FC<MenuItemCardProps> = ({ item }) => (
       <p className="line-clamp-3 text-sm leading-6 text-gray-600">
         {item.description || 'A delicious choice from this restaurant.'}
       </p>
-      {!item.is_available && (
-        <p className="mt-auto pt-3 text-sm font-semibold text-orange-700">
-          {item.unavailable_reason || 'Currently unavailable'}
-        </p>
-      )}
+      
+      <div className="mt-auto pt-3 flex items-center justify-between gap-3">
+        {!item.is_available ? (
+          <p className="text-sm font-semibold text-orange-700">
+            {item.unavailable_reason || 'Currently unavailable'}
+          </p>
+        ) : (
+          <>
+            {actionSlot}
+            {onAddToCart && (
+              <button
+                type="button"
+                onClick={() => onAddToCart(item)}
+                className="rounded-lg bg-[#FF8C00] px-3 py-1.5 text-xs font-bold text-[#0B132B] transition-colors hover:bg-[#e07b00]"
+              >
+                Add to cart
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
 
     {item.image && (
