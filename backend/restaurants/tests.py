@@ -33,10 +33,10 @@ class RestaurantModelTests(TestCase):
         menu_item = MenuItem.objects.create(
             restaurant=restaurant,
             category=category,
-            name="Salmon Roll",
-            description="Fresh salmon roll.",
+            name="Spicy Tuna Roll",
+            description="Fresh tuna with spicy mayo.",
             price=Decimal("12.50"),
-            image_url="https://example.com/salmon-roll.jpg",
+            image="spicy_tuna.jpg",
             is_available=True,
         )
 
@@ -58,7 +58,7 @@ class RestaurantSerializerTests(TestCase):
             name="Salmon Roll",
             description="Fresh salmon roll.",
             price=Decimal("12.50"),
-            image_url="https://example.com/salmon-roll.jpg",
+            image="https://example.com/salmon-roll.jpg",
             is_available=True,
         )
 
@@ -80,8 +80,9 @@ class RestaurantSerializerTests(TestCase):
                             "name": "Salmon Roll",
                             "description": "Fresh salmon roll.",
                             "price": "12.50",
-                            "image_url": "https://example.com/salmon-roll.jpg",
+                            "image": "/media/https%3A/example.com/salmon-roll.jpg",
                             "is_available": True,
+                            "unavailable_reason": "",
                         }
                     ],
                 }
@@ -104,7 +105,7 @@ class RestaurantApiTests(APITestCase):
             name="Salmon Roll",
             description="Fresh salmon roll.",
             price=Decimal("12.50"),
-            image_url="https://example.com/salmon-roll.jpg",
+            image="https://example.com/salmon-roll.jpg",
             is_available=True,
         )
         MenuItem.objects.create(
@@ -113,7 +114,7 @@ class RestaurantApiTests(APITestCase):
             name="Green Tea",
             description="Hot green tea.",
             price=Decimal("3.50"),
-            image_url="https://example.com/green-tea.jpg",
+            image="https://example.com/green-tea.jpg",
             is_available=False,
         )
         return restaurant, rolls, drinks
@@ -139,7 +140,9 @@ class RestaurantApiTests(APITestCase):
                     "cuisine": sushi.cuisine_id,
                     "cuisine_name": "Japanese",
                     "rating": "4.70",
+                    "review_count": 0,
                     "delivery_time": 35,
+                    "is_open_now": False,
                 },
                 {
                     "id": burger.id,
@@ -152,7 +155,9 @@ class RestaurantApiTests(APITestCase):
                     "cuisine": burger.cuisine_id,
                     "cuisine_name": "Japanese",
                     "rating": "4.70",
+                    "review_count": 0,
                     "delivery_time": 35,
+                    "is_open_now": False,
                 },
             ],
         )
@@ -161,7 +166,7 @@ class RestaurantApiTests(APITestCase):
         restaurant, rolls, drinks = self.create_restaurant_graph()
         url = reverse("restaurant-detail", args=[restaurant.id])
 
-        with self.assertNumQueries(2):
+        with self.assertNumQueries(3):
             response = cast(Response, self.client.get(url))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -201,7 +206,9 @@ class RestaurantApiTests(APITestCase):
                 "cuisine": restaurant.cuisine_id,
                 "cuisine_name": "Japanese",
                 "rating": "4.70",
+                "review_count": 0,
                 "delivery_time": 35,
+                "is_open_now": False,
                 "categories": [],
             },
         )
@@ -210,7 +217,8 @@ class RestaurantApiTests(APITestCase):
         create_restaurant(name="Sushi Place")
         create_restaurant(name="Burger Place")
 
-        with self.assertNumQueries(1):
+        # 1 for restaurant/cuisine, 1 for opening_hours, 1 for menu_items/categories
+        with self.assertNumQueries(2):
             response = cast(Response, self.client.get(self.list_url))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

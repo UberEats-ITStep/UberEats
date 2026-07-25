@@ -5,25 +5,25 @@ from restaurants.models import MenuItem, Restaurant
 
 
 class Order(models.Model):
-    STATUS_PENDING = 'Pending'
-    STATUS_ACCEPTED = 'Accepted'
-    STATUS_PREPARING = 'Preparing'
-    STATUS_READY = 'Ready'
-    STATUS_DELIVERING = 'Delivering'
-    STATUS_COMPLETED = 'Completed'
-    STATUS_CANCELLED = 'Cancelled'
+    STATUS_PENDING = 'PENDING'
+    STATUS_ACCEPTED = 'ACCEPTED'
+    STATUS_PREPARING = 'PREPARING'
+    STATUS_READY = 'READY'
+    STATUS_DELIVERING = 'DELIVERING'
+    STATUS_COMPLETED = 'COMPLETED'
+    STATUS_CANCELLED = 'CANCELLED'
 
     STATUS_CHOICES = (
-        (STATUS_PENDING, 'Pending'),
-        (STATUS_ACCEPTED, 'Accepted'),
-        (STATUS_PREPARING, 'Preparing'),
-        (STATUS_READY, 'Ready'),
-        (STATUS_DELIVERING, 'Delivering'),
-        (STATUS_COMPLETED, 'Completed'),
-        (STATUS_CANCELLED, 'Cancelled'),
+        (STATUS_PENDING, 'PENDING'),
+        (STATUS_ACCEPTED, 'ACCEPTED'),
+        (STATUS_PREPARING, 'PREPARING'),
+        (STATUS_READY, 'READY'),
+        (STATUS_DELIVERING, 'DELIVERING'),
+        (STATUS_COMPLETED, 'COMPLETED'),
+        (STATUS_CANCELLED, 'CANCELLED'),
     )
 
-    user = models.ForeignKey(
+    client = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='orders',
@@ -52,10 +52,9 @@ class Order(models.Model):
     )
     delivery_address = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f'Order #{self.id} - {self.user.email}'
+        return f'Order #{self.id} - {self.client.email}'
 
 
 class OrderItem(models.Model):

@@ -3,6 +3,15 @@
 import django.core.validators
 import django.utils.timezone
 from django.db import migrations, models
+from django.utils.text import slugify
+
+def populate_slugs(apps, schema_editor):
+    MenuItem = apps.get_model('restaurants', 'MenuItem')
+    for item in MenuItem.objects.all():
+        if not item.slug:
+            item.slug = slugify(item.name) or str(item.id)
+            item.save()
+
 
 
 class Migration(migrations.Migration):
@@ -66,6 +75,7 @@ class Migration(migrations.Migration):
             name='price',
             field=models.DecimalField(decimal_places=2, max_digits=10, validators=[django.core.validators.MinValueValidator(0.01)]),
         ),
+        migrations.RunPython(populate_slugs),
         migrations.AddConstraint(
             model_name='menuitem',
             constraint=models.UniqueConstraint(fields=('restaurant', 'slug'), name='unique_menu_item_slug_per_restaurant'),

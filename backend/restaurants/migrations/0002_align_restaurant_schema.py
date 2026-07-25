@@ -29,6 +29,7 @@ def remove_default_cuisine(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ("restaurants", "0001_initial"),
