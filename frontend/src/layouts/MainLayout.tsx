@@ -19,6 +19,12 @@ const MainLayout: React.FC = () => {
               {isAuthenticated ? (
                 <>
                   <Link
+                    to="/"
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    Restaurants
+                  </Link>
+                  <Link
                     to="/orders"
                     className="text-sm font-medium text-gray-700 hover:text-gray-900"
                   >

@@ -68,11 +68,11 @@ const RegisterForm: FC = () => {
       await register({
         email: formData.email,
         password: formData.password,
-        role: "Client",
+        role: "CLIENT",
         phone_number: formData.phoneNumber.trim() || undefined,
         address: formData.address.trim() || undefined,
       });
-      navigate("/profile", { replace: true });
+      navigate("/", { replace: true });
     } catch (error) {
       setRequestError(getAuthError(error, "Unable to create your account. Please try again."));
     } finally {
