@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 
     # --- APPS ---
     'restaurants',
+    'favorites',
     'orders',
     'users',
     'cart',

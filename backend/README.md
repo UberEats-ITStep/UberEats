@@ -145,3 +145,22 @@ curl -X PATCH http://127.0.0.1:8000/api/profile/ \
 - Registration, login, and token refresh do not require authentication.
 - Profile requests require a valid access token.
 - Missing, invalid, or expired access tokens return `401 Unauthorized`.
+
+## Favorites
+
+Apply the committed Favorites migration and run its tests:
+
+```bash
+python manage.py migrate
+python manage.py test favorites --keepdb
+```
+
+All endpoints require `Authorization: Bearer <access-token>`:
+
+- `GET /api/favorites/` lists the current user's favorites.
+- `POST /api/favorites/` with `{"restaurant": <id>}` adds one.
+- `DELETE /api/favorites/<id>/` removes the current user's favorite.
+- `GET /api/favorites/check/?restaurant=<id>` returns favorite status.
+
+Duplicate favorites return `400`. Favorites owned by another user are neither
+listed nor removable.
