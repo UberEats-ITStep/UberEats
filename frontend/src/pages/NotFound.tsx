@@ -1,15 +1,22 @@
-import React from 'react';
+import type { FC } from 'react';
 import { Link } from 'react-router-dom';
+import { SectionContainer, EmptyState, Button } from '../components/common';
 
-const NotFound: React.FC = () => {
+const NotFound: FC = () => {
   return (
-    <div className="flex flex-col items-center justify-center py-20">
-      <h1 className="text-6xl font-bold text-gray-900 mb-4">404</h1>
-      <p className="text-xl text-gray-600 mb-8">Page not found</p>
-      <Link to="/" className="text-green-600 hover:text-green-500 font-medium">
-        Go back home
-      </Link>
-    </div>
+    <SectionContainer width="content" padding="lg" className="flex min-h-[70vh] items-center justify-center">
+      <EmptyState
+        title="404 — Page Not Found"
+        description="The page you are looking for might have been removed, had its name changed, or is temporarily unavailable."
+        action={
+          <Link to="/">
+            <Button variant="primary" size="md">
+              Go back home
+            </Button>
+          </Link>
+        }
+      />
+    </SectionContainer>
   );
 };
 

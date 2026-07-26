@@ -11,51 +11,63 @@ export interface UseRestaurantDetailsReturn {
 
 export const useRestaurantDetails = (restaurantId?: string): UseRestaurantDetailsReturn => {
   const numericRestaurantId = Number(restaurantId);
+  const isValidId = Number.isInteger(numericRestaurantId) && numericRestaurantId > 0;
+
   const [restaurant, setRestaurant] = useState<RestaurantDetails | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(isValidId);
+  const [error, setError] = useState<string | null>(isValidId ? null : 'This restaurant link is not valid.');
 
-  const loadRestaurant = useCallback(
-    async (signal?: AbortSignal) => {
-      if (!Number.isInteger(numericRestaurantId) || numericRestaurantId <= 0) {
-        setError('This restaurant link is not valid.');
-        setIsLoading(false);
-        return;
-      }
+  useEffect(() => {
+    if (!isValidId) {
+      return;
+    }
+    const controller = new AbortController();
 
-      setIsLoading(true);
-      setError(null);
-
+    const loadInitialRestaurant = async () => {
       try {
         const data = await restaurantService.getRestaurantDetails(
           numericRestaurantId,
-          signal,
+          controller.signal,
         );
-        if (!signal?.aborted) {
+        if (!controller.signal.aborted) {
           setRestaurant(data);
+          setError(null);
         }
       } catch {
-        if (!signal?.aborted) {
+        if (!controller.signal.aborted) {
           setError('We could not load this restaurant right now. Please try again.');
         }
       } finally {
-        if (!signal?.aborted) {
+        if (!controller.signal.aborted) {
           setIsLoading(false);
         }
       }
-    },
-    [numericRestaurantId],
-  );
+    };
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void loadRestaurant(controller.signal);
+    void loadInitialRestaurant();
+
     return () => controller.abort();
-  }, [loadRestaurant]);
+  }, [isValidId, numericRestaurantId]);
 
   const reload = useCallback(() => {
-    void loadRestaurant();
-  }, [loadRestaurant]);
+    if (!isValidId) return;
+    setIsLoading(true);
+    setError(null);
+
+    const reloadData = async () => {
+      try {
+        const data = await restaurantService.getRestaurantDetails(numericRestaurantId);
+        setRestaurant(data);
+        setError(null);
+      } catch {
+        setError('We could not load this restaurant right now. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void reloadData();
+  }, [isValidId, numericRestaurantId]);
 
   return { restaurant, isLoading, error, reload };
 };
