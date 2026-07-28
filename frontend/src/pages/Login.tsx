@@ -1,11 +1,12 @@
 import type { FC } from 'react';
+import { SectionContainer } from '../components/common';
 import LoginForm from '../features/auth/components/LoginForm';
 
 const Login: FC = () => {
   return (
-    <div className="min-h-[80vh] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8">
+    <SectionContainer width="auth" padding="lg" className="flex min-h-[80vh] flex-col justify-center">
       <LoginForm />
-    </div>
+    </SectionContainer>
   );
 };
 
