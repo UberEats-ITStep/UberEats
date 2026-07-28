@@ -253,6 +253,18 @@ class SearchFilterOrderingPaginationTests(TestCase):
         names = [r["name"] for r in response.data["results"]]
         self.assertEqual(names, ["Pizzeria Bella"])
 
+    def test_search_combines_with_filters(self):
+        request = self.factory.get(
+            "/",
+            {
+                "search": "pizzeria",
+                "cuisine": self.pizzeria.cuisine_id,
+                "rating__gte": "4",
+            },
+        )
+        response = self.view(request)
+        self.assertEqual([r["name"] for r in response.data["results"]], ["Pizzeria Bella"])
+
     def test_order_by_rating(self):
         request = self.factory.get("/", {"ordering": "-rating"})
         response = self.view(request)
@@ -264,6 +276,19 @@ class SearchFilterOrderingPaginationTests(TestCase):
         response = self.item_view(request)
         names = [r["name"] for r in response.data["results"]]
         self.assertEqual(names, ["Margherita Pizza"])
+
+    def test_search_menu_item_by_name(self):
+        request = self.factory.get("/", {"search": "pizza"})
+        response = self.item_view(request)
+        self.assertEqual([r["name"] for r in response.data["results"]], ["Margherita Pizza"])
+
+    def test_order_menu_items_by_price(self):
+        request = self.factory.get("/", {"ordering": "price"})
+        response = self.item_view(request)
+        self.assertEqual(
+            [r["name"] for r in response.data["results"]],
+            ["Cola", "Margherita Pizza"],
+        )
 
     def test_pagination_metadata(self):
         request = self.factory.get("/", {"page_size": "1"})
