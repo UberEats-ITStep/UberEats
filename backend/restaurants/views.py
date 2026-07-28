@@ -1,5 +1,7 @@
 from django.db.models import Prefetch
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
+from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import Category, Cuisine, MenuItem, Restaurant
 from .serializers import (
@@ -11,8 +13,25 @@ from .serializers import (
 )
 
 
+class StandardPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = RestaurantListSerializer
+    pagination_class = StandardPagination
+
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        "cuisine": ["exact"],
+        "rating": ["gte", "lte"],
+        "delivery_time": ["gte", "lte"],
+    }
+    search_fields = ["name"]
+    ordering_fields = ["rating", "name", "delivery_time"]
+    ordering = ["-rating"]
 
     def get_queryset(self):
         queryset = Restaurant.objects.order_by("id").select_related("cuisine").prefetch_related("opening_hours")
@@ -41,6 +60,18 @@ class CategoryCRUD(viewsets.ModelViewSet):
 class MenuItemCRUD(viewsets.ModelViewSet):
     queryset = MenuItem.objects.order_by("id").select_related("restaurant", "category")
     serializer_class = MenuItemSerializer
+    pagination_class = StandardPagination
+
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        "category": ["exact"],
+        "restaurant": ["exact"],
+        "is_available": ["exact"],
+        "price": ["gte", "lte"],
+    }
+    search_fields = ["name"]
+    ordering_fields = ["price", "name"]
+    ordering = ["category", "name"]
 
 
 class CuisineCRUD(viewsets.ModelViewSet):
