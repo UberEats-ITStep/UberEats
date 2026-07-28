@@ -222,3 +222,76 @@ class RestaurantApiTests(APITestCase):
             response = cast(Response, self.client.get(self.list_url))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+from rest_framework.test import APIRequestFactory
+from .views import MenuItemCRUD, RestaurantViewSet
+
+class SearchFilterOrderingPaginationTests(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.view = RestaurantViewSet.as_view({"get": "list"})
+        self.item_view = MenuItemCRUD.as_view({"get": "list"})
+
+        italian = Cuisine.objects.create(name="Italian")
+        japanese = Cuisine.objects.create(name="Japanese")
+
+        self.pizzeria = Restaurant.objects.create(name="Pizzeria Bella", cuisine=italian, rating=Decimal("4.50"), delivery_time=25)
+        self.sushi = Restaurant.objects.create(name="Sushi House", cuisine=japanese, rating=Decimal("4.80"), delivery_time=40)
+
+        mains = Category.objects.create(name="Mains")
+        self.pizza = MenuItem.objects.create(restaurant=self.pizzeria, category=mains, name="Margherita Pizza", price=Decimal("199"), is_available=True)
+        self.cola = MenuItem.objects.create(restaurant=self.pizzeria, category=mains, name="Cola", price=Decimal("39"), is_available=False)
+
+    def test_search_restaurant_by_name(self):
+        request = self.factory.get("/", {"search": "pizzeria"})
+        response = self.view(request)
+        self.assertEqual(len(response.data["results"]), 1)
+
+    def test_filter_by_cuisine_and_min_rating(self):
+        request = self.factory.get("/", {"cuisine": self.pizzeria.cuisine_id, "rating__gte": "4"})
+        response = self.view(request)
+        names = [r["name"] for r in response.data["results"]]
+        self.assertEqual(names, ["Pizzeria Bella"])
+
+    def test_search_combines_with_filters(self):
+        request = self.factory.get(
+            "/",
+            {
+                "search": "pizzeria",
+                "cuisine": self.pizzeria.cuisine_id,
+                "rating__gte": "4",
+            },
+        )
+        response = self.view(request)
+        self.assertEqual([r["name"] for r in response.data["results"]], ["Pizzeria Bella"])
+
+    def test_order_by_rating(self):
+        request = self.factory.get("/", {"ordering": "-rating"})
+        response = self.view(request)
+        names = [r["name"] for r in response.data["results"]]
+        self.assertEqual(names, ["Sushi House", "Pizzeria Bella"])
+
+    def test_menu_item_available_filter(self):
+        request = self.factory.get("/", {"is_available": "true"})
+        response = self.item_view(request)
+        names = [r["name"] for r in response.data["results"]]
+        self.assertEqual(names, ["Margherita Pizza"])
+
+    def test_search_menu_item_by_name(self):
+        request = self.factory.get("/", {"search": "pizza"})
+        response = self.item_view(request)
+        self.assertEqual([r["name"] for r in response.data["results"]], ["Margherita Pizza"])
+
+    def test_order_menu_items_by_price(self):
+        request = self.factory.get("/", {"ordering": "price"})
+        response = self.item_view(request)
+        self.assertEqual(
+            [r["name"] for r in response.data["results"]],
+            ["Cola", "Margherita Pizza"],
+        )
+
+    def test_pagination_metadata(self):
+        request = self.factory.get("/", {"page_size": "1"})
+        response = self.view(request)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 1)
