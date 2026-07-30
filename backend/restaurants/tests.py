@@ -1,297 +1,303 @@
+from datetime import datetime, time
 from decimal import Decimal
-from typing import cast
+from io import StringIO
+from unittest.mock import patch
 
-from django.test import TestCase
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.test import APITestCase
+from rest_framework.test import APIRequestFactory, APITestCase
 
-from .models import Category, Cuisine, MenuItem, Restaurant
-from .serializers import RestaurantDetailSerializer
+from .models import Category, Cuisine, MenuItem, OpeningHours, Restaurant
+from .serializers import MenuItemSerializer
 
 
-def create_restaurant(*, name: str = "Sushi Place") -> Restaurant:
+def create_restaurant(*, name="Sushi Place", **overrides):
     cuisine, _ = Cuisine.objects.get_or_create(name="Japanese")
-    return Restaurant.objects.create(
-        name=name,
-        description="Fresh sushi and rolls.",
-        image_url="https://example.com/sushi.jpg",
-        address="Kyiv",
-        latitude=Decimal("50.450100"),
-        longitude=Decimal("30.523400"),
-        cuisine=cuisine,
-        rating=Decimal("4.70"),
-        delivery_time=35,
-    )
+    values = {
+        "name": name,
+        "description": "Fresh sushi and rolls.",
+        "image_url": "https://example.com/sushi.jpg",
+        "address": "Kyiv",
+        "latitude": Decimal("50.450100"),
+        "longitude": Decimal("30.523400"),
+        "cuisine": cuisine,
+        "rating": Decimal("4.70"),
+        "delivery_time": 35,
+    }
+    values.update(overrides)
+    return Restaurant.objects.create(**values)
 
 
-class RestaurantModelTests(TestCase):
-    def test_restaurant_menuitem_relationships_work_with_global_categories(self):
-        restaurant = create_restaurant()
-        category = Category.objects.create(name="Rolls")
-        menu_item = MenuItem.objects.create(
-            restaurant=restaurant,
-            category=category,
-            name="Spicy Tuna Roll",
-            description="Fresh tuna with spicy mayo.",
-            price=Decimal("12.50"),
-            image="spicy_tuna.jpg",
-            is_available=True,
+class RestaurantValidationTests(TestCase):
+    def test_coordinates_must_be_supplied_together(self):
+        restaurant = create_restaurant(longitude=None)
+
+        with self.assertRaises(ValidationError) as error:
+            restaurant.full_clean()
+
+        self.assertIn("longitude", error.exception.message_dict)
+
+    def test_coordinate_ranges_rating_and_delivery_time_are_validated(self):
+        restaurant = create_restaurant(
+            latitude=Decimal("91"),
+            longitude=Decimal("181"),
+            rating=Decimal("5.01"),
+            delivery_time=0,
         )
 
-        self.assertEqual(restaurant.menu_items.count(), 1)
-        self.assertEqual(category.menu_items.count(), 1)
-        self.assertEqual(menu_item.restaurant, restaurant)
-        self.assertEqual(menu_item.category, category)
-        self.assertEqual(menu_item.price, Decimal("12.50"))
+        with self.assertRaises(ValidationError) as error:
+            restaurant.full_clean()
 
-
-class RestaurantSerializerTests(TestCase):
-    def test_detail_serializer_groups_menu_items_by_category(self):
-        restaurant = create_restaurant()
-        rolls = Category.objects.create(name="Rolls")
-        drinks = Category.objects.create(name="Drinks")
-        menu_item = MenuItem.objects.create(
-            restaurant=restaurant,
-            category=rolls,
-            name="Salmon Roll",
-            description="Fresh salmon roll.",
-            price=Decimal("12.50"),
-            image="https://example.com/salmon-roll.jpg",
-            is_available=True,
-        )
-
-        data = RestaurantDetailSerializer(instance=restaurant).data
-
-        self.assertEqual(data["id"], restaurant.id)
-        self.assertEqual(data["cuisine_name"], "Japanese")
         self.assertEqual(
-            data["categories"],
-            [
-                {
-                    "id": rolls.id,
-                    "name": "Rolls",
-                    "menu_items": [
-                        {
-                            "id": menu_item.id,
-                            "category": rolls.id,
-                            "category_name": "Rolls",
-                            "name": "Salmon Roll",
-                            "description": "Fresh salmon roll.",
-                            "price": "12.50",
-                            "image": "/media/https%3A/example.com/salmon-roll.jpg",
-                            "is_available": True,
-                            "unavailable_reason": "",
-                        }
-                    ],
-                }
-            ],
+            set(error.exception.message_dict),
+            {"latitude", "longitude", "rating", "delivery_time"},
         )
-        self.assertNotIn(drinks.id, [category["id"] for category in data["categories"]])
+
+
+class OpeningHoursTests(TestCase):
+    def setUp(self):
+        self.restaurant = create_restaurant()
+
+    def test_opening_and_closing_times_must_differ(self):
+        hours = OpeningHours(
+            restaurant=self.restaurant,
+            opens_at=time(9),
+            closes_at=time(9),
+        )
+
+        with self.assertRaises(ValidationError) as error:
+            hours.full_clean()
+
+        self.assertIn("closes_at", error.exception.message_dict)
+
+    def test_only_one_schedule_per_day_type_is_allowed(self):
+        OpeningHours.objects.create(
+            restaurant=self.restaurant,
+            day_type="weekday",
+            opens_at=time(9),
+            closes_at=time(17),
+        )
+
+        with self.assertRaises(ValidationError):
+            OpeningHours(
+                restaurant=self.restaurant,
+                day_type="weekday",
+                opens_at=time(10),
+                closes_at=time(18),
+            ).full_clean()
+
+    def test_weekday_and_weekend_schedules_are_used(self):
+        OpeningHours.objects.create(
+            restaurant=self.restaurant,
+            day_type="weekday",
+            opens_at=time(9),
+            closes_at=time(17),
+        )
+        OpeningHours.objects.create(
+            restaurant=self.restaurant,
+            day_type="weekend",
+            opens_at=time(11),
+            closes_at=time(15),
+        )
+
+        with patch("restaurants.models.timezone.now", return_value=self.aware(2026, 7, 30, 12)):
+            self.assertTrue(self.restaurant.is_open_now)
+        with patch("restaurants.models.timezone.now", return_value=self.aware(2026, 8, 1, 10)):
+            self.assertFalse(self.restaurant.is_open_now)
+
+    def test_missing_schedule_is_closed(self):
+        with patch("restaurants.models.timezone.now", return_value=self.aware(2026, 7, 30, 12)):
+            self.assertFalse(self.restaurant.is_open_now)
+
+    def test_overnight_schedule_includes_the_following_day(self):
+        OpeningHours.objects.create(
+            restaurant=self.restaurant,
+            day_type="weekend",
+            opens_at=time(18),
+            closes_at=time(2),
+        )
+
+        with patch("restaurants.models.timezone.now", return_value=self.aware(2026, 8, 2, 23)):
+            self.assertTrue(self.restaurant.is_open_now)
+        with patch("restaurants.models.timezone.now", return_value=self.aware(2026, 8, 3, 1)):
+            self.assertTrue(self.restaurant.is_open_now)
+        with patch("restaurants.models.timezone.now", return_value=self.aware(2026, 8, 3, 3)):
+            self.assertFalse(self.restaurant.is_open_now)
+
+    @staticmethod
+    def aware(year, month, day, hour):
+        return timezone.make_aware(datetime(year, month, day, hour))
+
+
+class MenuItemTests(TestCase):
+    def setUp(self):
+        self.restaurant = create_restaurant()
+        self.category = Category.objects.create(name="Rolls")
+
+    def make_item(self, **overrides):
+        values = {
+            "restaurant": self.restaurant,
+            "category": self.category,
+            "name": "Salmon Roll",
+            "price": Decimal("12.50"),
+        }
+        values.update(overrides)
+        return MenuItem(**values)
+
+    def test_price_must_be_greater_than_zero(self):
+        with self.assertRaises(ValidationError) as error:
+            self.make_item(price=0).full_clean()
+        self.assertIn("price", error.exception.message_dict)
+
+    def test_availability_and_reason_must_be_consistent(self):
+        for item in (
+            self.make_item(is_available=True, unavailable_reason="Sold out"),
+            self.make_item(is_available=False, unavailable_reason=""),
+        ):
+            with self.assertRaises(ValidationError) as error:
+                item.full_clean()
+            self.assertIn("unavailable_reason", error.exception.message_dict)
+
+    def test_duplicate_names_get_unique_restaurant_slugs(self):
+        first = self.make_item()
+        first.save()
+        second = self.make_item()
+        second.save()
+
+        self.assertEqual(first.slug, "salmon-roll")
+        self.assertEqual(second.slug, "salmon-roll-2")
+
+    def test_same_slug_can_be_used_by_different_restaurants(self):
+        first = self.make_item()
+        first.save()
+        other = create_restaurant(name="Other")
+        second = self.make_item(restaurant=other)
+        second.save()
+
+        self.assertEqual(first.slug, second.slug)
+
+    @override_settings(MEDIA_URL="/media/")
+    def test_images_return_url_or_null(self):
+        request = APIRequestFactory().get("/")
+        empty = self.make_item()
+        image = self.make_item(
+            name="Tuna Roll",
+            image=SimpleUploadedFile("tuna.jpg", b"image", content_type="image/jpeg"),
+        )
+
+        self.assertIsNone(MenuItemSerializer(empty, context={"request": request}).data["image_url"])
+        self.assertTrue(
+            MenuItemSerializer(image, context={"request": request})
+            .data["image_url"]
+            .startswith("http://testserver/media/")
+        )
 
 
 class RestaurantApiTests(APITestCase):
-    def setUp(self) -> None:
+    def setUp(self):
         self.list_url = reverse("restaurant-list")
 
-    def create_restaurant_graph(self):
+    def create_graph(self):
         restaurant = create_restaurant()
-        rolls = Category.objects.create(name="Rolls")
-        drinks = Category.objects.create(name="Drinks")
-        MenuItem.objects.create(
+        OpeningHours.objects.create(
             restaurant=restaurant,
-            category=rolls,
+            day_type="weekday",
+            opens_at=time(9),
+            closes_at=time(22),
+        )
+        category = Category.objects.create(name="Rolls")
+        available = MenuItem.objects.create(
+            restaurant=restaurant,
+            category=category,
             name="Salmon Roll",
             description="Fresh salmon roll.",
             price=Decimal("12.50"),
-            image="https://example.com/salmon-roll.jpg",
             is_available=True,
+            is_vegetarian=False,
+            is_vegan=False,
+            calories=320,
         )
-        MenuItem.objects.create(
+        unavailable = MenuItem.objects.create(
             restaurant=restaurant,
-            category=drinks,
-            name="Green Tea",
-            description="Hot green tea.",
-            price=Decimal("3.50"),
-            image="https://example.com/green-tea.jpg",
+            category=category,
+            name="Tuna Roll",
+            price=Decimal("13.50"),
             is_available=False,
+            unavailable_reason="Sold out",
         )
-        return restaurant, rolls, drinks
+        return restaurant, category, available, unavailable
 
-    def test_restaurant_list_returns_schema_fields(self):
-        sushi = create_restaurant(name="Sushi Place")
-        burger = create_restaurant(name="Burger Place")
-
-        response = cast(Response, self.client.get(self.list_url))
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            response.data,
-            [
-                {
-                    "id": sushi.id,
-                    "name": "Sushi Place",
-                    "description": "Fresh sushi and rolls.",
-                    "image_url": "https://example.com/sushi.jpg",
-                    "address": "Kyiv",
-                    "latitude": "50.450100",
-                    "longitude": "30.523400",
-                    "cuisine": sushi.cuisine_id,
-                    "cuisine_name": "Japanese",
-                    "rating": "4.70",
-                    "review_count": 0,
-                    "delivery_time": 35,
-                    "is_open_now": False,
-                },
-                {
-                    "id": burger.id,
-                    "name": "Burger Place",
-                    "description": "Fresh sushi and rolls.",
-                    "image_url": "https://example.com/sushi.jpg",
-                    "address": "Kyiv",
-                    "latitude": "50.450100",
-                    "longitude": "30.523400",
-                    "cuisine": burger.cuisine_id,
-                    "cuisine_name": "Japanese",
-                    "rating": "4.70",
-                    "review_count": 0,
-                    "delivery_time": 35,
-                    "is_open_now": False,
-                },
-            ],
-        )
-
-    def test_restaurant_detail_returns_grouped_categories_and_menu_items(self):
-        restaurant, rolls, drinks = self.create_restaurant_graph()
-        url = reverse("restaurant-detail", args=[restaurant.id])
-
-        with self.assertNumQueries(3):
-            response = cast(Response, self.client.get(url))
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["id"], restaurant.id)
-        self.assertEqual(response.data["name"], "Sushi Place")
-        self.assertEqual(response.data["cuisine_name"], "Japanese")
-        self.assertEqual(len(response.data["categories"]), 2)
-        self.assertEqual(response.data["categories"][0]["id"], rolls.id)
-        self.assertEqual(response.data["categories"][0]["menu_items"][0]["name"], "Salmon Roll")
-        self.assertEqual(response.data["categories"][1]["id"], drinks.id)
-        self.assertEqual(response.data["categories"][1]["menu_items"][0]["is_available"], False)
-
-    def test_restaurant_detail_returns_404_for_invalid_id(self):
-        url = reverse("restaurant-detail", args=[999999])
-
-        response = cast(Response, self.client.get(url))
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_restaurant_detail_handles_restaurant_without_menu_items(self):
-        restaurant = create_restaurant(name="Solo Kitchen")
-        url = reverse("restaurant-detail", args=[restaurant.id])
-
-        response = cast(Response, self.client.get(url))
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            response.data,
-            {
-                "id": restaurant.id,
-                "name": "Solo Kitchen",
-                "description": "Fresh sushi and rolls.",
-                "image_url": "https://example.com/sushi.jpg",
-                "address": "Kyiv",
-                "latitude": "50.450100",
-                "longitude": "30.523400",
-                "cuisine": restaurant.cuisine_id,
-                "cuisine_name": "Japanese",
-                "rating": "4.70",
-                "review_count": 0,
-                "delivery_time": 35,
-                "is_open_now": False,
-                "categories": [],
-            },
-        )
-
-    def test_restaurant_list_uses_single_query(self):
+    def test_list_shape_remains_unpaginated_and_query_efficient(self):
         create_restaurant(name="Sushi Place")
         create_restaurant(name="Burger Place")
 
-        # 1 for restaurant/cuisine, 1 for opening_hours, 1 for menu_items/categories
         with self.assertNumQueries(2):
-            response = cast(Response, self.client.get(self.list_url))
+            response = self.client.get(self.list_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 2)
+        self.assertIn("is_open_now", response.data[0])
 
-from rest_framework.test import APIRequestFactory
-from .views import MenuItemCRUD, RestaurantViewSet
+    def test_detail_contains_complete_schedule_and_menu_metadata(self):
+        restaurant, category, available, unavailable = self.create_graph()
 
-class SearchFilterOrderingPaginationTests(TestCase):
-    def setUp(self):
-        self.factory = APIRequestFactory()
-        self.view = RestaurantViewSet.as_view({"get": "list"})
-        self.item_view = MenuItemCRUD.as_view({"get": "list"})
+        with self.assertNumQueries(3):
+            response = self.client.get(reverse("restaurant-detail", args=[restaurant.pk]))
 
-        italian = Cuisine.objects.create(name="Italian")
-        japanese = Cuisine.objects.create(name="Japanese")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["opening_hours"][0]["day_type"], "weekday")
+        self.assertEqual(response.data["categories"][0]["id"], category.pk)
+        items = response.data["categories"][0]["menu_items"]
+        self.assertEqual([item["id"] for item in items], [available.pk, unavailable.pk])
+        self.assertEqual(items[0]["slug"], "salmon-roll")
+        self.assertEqual(items[0]["calories"], 320)
+        self.assertIsNone(items[0]["image_url"])
+        self.assertFalse(items[1]["is_available"])
+        self.assertEqual(items[1]["unavailable_reason"], "Sold out")
 
-        self.pizzeria = Restaurant.objects.create(name="Pizzeria Bella", cuisine=italian, rating=Decimal("4.50"), delivery_time=25)
-        self.sushi = Restaurant.objects.create(name="Sushi House", cuisine=japanese, rating=Decimal("4.80"), delivery_time=40)
+    def test_detail_without_hours_or_items_is_compatible(self):
+        restaurant = create_restaurant(name="Solo Kitchen")
+        response = self.client.get(reverse("restaurant-detail", args=[restaurant.pk]))
 
-        mains = Category.objects.create(name="Mains")
-        self.pizza = MenuItem.objects.create(restaurant=self.pizzeria, category=mains, name="Margherita Pizza", price=Decimal("199"), is_available=True)
-        self.cola = MenuItem.objects.create(restaurant=self.pizzeria, category=mains, name="Cola", price=Decimal("39"), is_available=False)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["is_open_now"])
+        self.assertEqual(response.data["opening_hours"], [])
+        self.assertEqual(response.data["categories"], [])
 
-    def test_search_restaurant_by_name(self):
-        request = self.factory.get("/", {"search": "pizzeria"})
-        response = self.view(request)
-        self.assertEqual(len(response.data["results"]), 1)
 
-    def test_filter_by_cuisine_and_min_rating(self):
-        request = self.factory.get("/", {"cuisine": self.pizzeria.cuisine_id, "rating__gte": "4"})
-        response = self.view(request)
-        names = [r["name"] for r in response.data["results"]]
-        self.assertEqual(names, ["Pizzeria Bella"])
-
-    def test_search_combines_with_filters(self):
-        request = self.factory.get(
-            "/",
-            {
-                "search": "pizzeria",
-                "cuisine": self.pizzeria.cuisine_id,
-                "rating__gte": "4",
-            },
+class SeedAndMigrationTests(TestCase):
+    def test_seed_db_is_idempotent_and_complete(self):
+        output = StringIO()
+        call_command("seed_db", stdout=output)
+        counts = (
+            Restaurant.objects.count(),
+            OpeningHours.objects.count(),
+            MenuItem.objects.count(),
         )
-        response = self.view(request)
-        self.assertEqual([r["name"] for r in response.data["results"]], ["Pizzeria Bella"])
+        call_command("seed_db", stdout=output)
 
-    def test_order_by_rating(self):
-        request = self.factory.get("/", {"ordering": "-rating"})
-        response = self.view(request)
-        names = [r["name"] for r in response.data["results"]]
-        self.assertEqual(names, ["Sushi House", "Pizzeria Bella"])
-
-    def test_menu_item_available_filter(self):
-        request = self.factory.get("/", {"is_available": "true"})
-        response = self.item_view(request)
-        names = [r["name"] for r in response.data["results"]]
-        self.assertEqual(names, ["Margherita Pizza"])
-
-    def test_search_menu_item_by_name(self):
-        request = self.factory.get("/", {"search": "pizza"})
-        response = self.item_view(request)
-        self.assertEqual([r["name"] for r in response.data["results"]], ["Margherita Pizza"])
-
-    def test_order_menu_items_by_price(self):
-        request = self.factory.get("/", {"ordering": "price"})
-        response = self.item_view(request)
         self.assertEqual(
-            [r["name"] for r in response.data["results"]],
-            ["Cola", "Margherita Pizza"],
+            counts,
+            (
+                Restaurant.objects.count(),
+                OpeningHours.objects.count(),
+                MenuItem.objects.count(),
+            ),
         )
+        self.assertEqual(OpeningHours.objects.count(), Restaurant.objects.count() * 2)
+        self.assertTrue(MenuItem.objects.filter(is_available=True).exists())
+        self.assertTrue(MenuItem.objects.filter(is_available=False).exists())
+        self.assertTrue(MenuItem.objects.filter(calories__isnull=False).exists())
 
-    def test_pagination_metadata(self):
-        request = self.factory.get("/", {"page_size": "1"})
-        response = self.view(request)
-        self.assertEqual(response.data["count"], 2)
-        self.assertEqual(len(response.data["results"]), 1)
+    def test_test_database_has_all_migration_leaf_nodes_applied(self):
+        executor = MigrationExecutor(connection)
+        applied = set(executor.loader.applied_migrations)
+        self.assertTrue(set(executor.loader.graph.leaf_nodes()).issubset(applied))

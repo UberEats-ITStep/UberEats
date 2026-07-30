@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from restaurants.models import Category, Cuisine, MenuItem, Restaurant
+from restaurants.models import Category, Cuisine, MenuItem, OpeningHours, Restaurant
 
 
 User = get_user_model()
@@ -31,34 +31,44 @@ class Command(BaseCommand):
                 email=admin_email,
                 username="admin",
                 password="password123",
-                role="Admin",
+                role="ADMIN",
             )
             self.stdout.write(self.style.SUCCESS(f" Created Admin: {admin_email}"))
         else:
+            admin = User.objects.get(email=admin_email)
+            if admin.role != "ADMIN":
+                admin.role = "ADMIN"
+                admin.save(update_fields=["role"])
             self.stdout.write(f" Admin {admin_email} already exists.")
 
         client_email = "client@example.com"
         client_user, created = User.objects.get_or_create(
             email=client_email,
-            defaults={"username": "client_user", "role": "Client"},
+            defaults={"username": "client_user", "role": "CLIENT"},
         )
         if created:
             client_user.set_password("password123")
             client_user.save()
             self.stdout.write(self.style.SUCCESS(f" Created Client: {client_email}"))
         else:
+            if client_user.role != "CLIENT":
+                client_user.role = "CLIENT"
+                client_user.save(update_fields=["role"])
             self.stdout.write(f" Client {client_email} already exists.")
 
         courier_email = "courier@example.com"
         courier_user, created = User.objects.get_or_create(
             email=courier_email,
-            defaults={"username": "courier_user", "role": "Courier"},
+            defaults={"username": "courier_user", "role": "COURIER"},
         )
         if created:
             courier_user.set_password("password123")
             courier_user.save()
             self.stdout.write(self.style.SUCCESS(f" Created Courier: {courier_email}"))
         else:
+            if courier_user.role != "COURIER":
+                courier_user.role = "COURIER"
+                courier_user.save(update_fields=["role"])
             self.stdout.write(f" Courier {courier_email} already exists.")
 
     def _create_restaurants_and_menus(self):
@@ -217,23 +227,44 @@ class Command(BaseCommand):
                     ]
                 )
 
+            OpeningHours.objects.update_or_create(
+                restaurant=restaurant,
+                day_type="weekday",
+                defaults={"opens_at": "09:00", "closes_at": "22:00"},
+            )
+            OpeningHours.objects.update_or_create(
+                restaurant=restaurant,
+                day_type="weekend",
+                defaults={"opens_at": "10:00", "closes_at": "23:00"},
+            )
+
             for category_name, menu_items in restaurant_data["items"].items():
                 category, category_created = Category.objects.get_or_create(name=category_name)
                 if category_created:
                     created_categories += 1
 
                 for item_name, item_description, item_price in menu_items:
-                    _, item_created = MenuItem.objects.get_or_create(
+                    is_available = item_name not in {"Chicken Wings", "Strawberry Shake", "Sake"}
+                    item, item_created = MenuItem.objects.update_or_create(
                         restaurant=restaurant,
-                        category=category,
                         name=item_name,
                         defaults={
+                            "category": category,
                             "description": item_description,
                             "price": item_price,
-                            "image_url": "",
-                            "is_available": True,
+                            "is_available": is_available,
+                            "unavailable_reason": "" if is_available else "Temporarily sold out",
+                            "is_vegetarian": item_name in {
+                                "Margherita", "Garlic Bread", "French Fries",
+                                "Onion Rings", "Edamame", "Miso Soup",
+                            },
+                            "is_vegan": item_name in {"French Fries", "Edamame"},
+                            "calories": 120 + len(item_name) * 10,
                         },
                     )
+                    if item.image:
+                        item.image = None
+                        item.save(update_fields=["image"])
                     if item_created:
                         created_items += 1
 
