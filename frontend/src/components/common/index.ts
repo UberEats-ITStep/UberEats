@@ -27,3 +27,7 @@ export { default as Alert } from './Alert';
 
 export * from './SectionContainer';
 export { default as SectionContainer } from './SectionContainer';
+export * from './Drawer';
+export { default as Drawer } from './Drawer';
+export * from './Modal';
+export { default as Modal } from './Modal';

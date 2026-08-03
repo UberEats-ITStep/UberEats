@@ -6,10 +6,19 @@ import RestaurantStats from '../features/restaurants/components/RestaurantStats'
 import CategoryNavbar from '../features/restaurants/components/CategoryNavbar';
 import MenuSection from '../features/restaurants/components/MenuSection';
 import { LoadingState, Alert, Button, SectionContainer } from '../components/common';
+import { useCart } from '../context/CartContext';
+import type { MenuItem } from '../features/restaurants/types/restaurant.types';
 
 const RestaurantDetails: FC = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
   const { restaurant, isLoading, error, reload } = useRestaurantDetails(restaurantId);
+  const { addToCart } = useCart();
+
+  const handleAddToCart = (item: MenuItem) => {
+    if (restaurant) {
+      void addToCart(item.id, 1, restaurant.id);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -60,7 +69,7 @@ const RestaurantDetails: FC = () => {
           <CategoryNavbar categories={restaurant.categories} />
         </div>
 
-        <MenuSection categories={restaurant.categories} />
+        <MenuSection categories={restaurant.categories} onAddToCart={handleAddToCart} />
       </main>
     </SectionContainer>
   );
