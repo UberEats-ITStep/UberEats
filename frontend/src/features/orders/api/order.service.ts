@@ -16,4 +16,9 @@ export const orderService = {
         }
         return response.data as Order[];
     },
+    
+    async checkout(delivery_address: string): Promise<Order> {
+        const response = await apiClient.post<Order>('/orders/checkout/', { delivery_address });
+        return response.data;
+    },
 };

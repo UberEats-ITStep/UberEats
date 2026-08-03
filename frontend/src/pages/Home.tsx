@@ -1,12 +1,52 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { FC, ChangeEvent } from 'react';
+import type { FC } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import RestaurantCard from '../features/restaurants/components/RestaurantCard';
 import { restaurantService } from '../features/restaurants/api/restaurant.service';
 import type { Restaurant } from '../features/restaurants/types/restaurant.types';
-import { SectionContainer, Input, LoadingState, EmptyState, Alert } from '../components/common';
+import { SectionContainer, LoadingState, EmptyState, Alert } from '../components/common';
+import PromotionCarousel from '../features/home/components/PromotionCarousel';
+import type { Promotion } from '../features/home/types/promotion.types';
+
+const MOCK_PROMOTIONS: Promotion[] = [
+  {
+    id: 1,
+    title: 'Free Delivery Weekend',
+    description: 'Enjoy free delivery on all orders over $20 this weekend only!',
+    ctaText: 'Order Now',
+    ctaLink: '/restaurants',
+    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
+    textColor: 'text-white',
+    accentColor: 'text-accent',
+    illustrationEmoji: '🛵',
+  },
+  {
+    id: 2,
+    title: '20% Off Sushi',
+    description: 'Craving sushi? Get a sweet 20% discount on top-rated sushi places.',
+    ctaText: 'Find Sushi',
+    ctaLink: '/?q=sushi',
+    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
+    textColor: 'text-white',
+    accentColor: 'text-rose-500',
+    illustrationEmoji: '🍣',
+  },
+  {
+    id: 3,
+    title: 'Summer Deals',
+    description: 'Cool down with buy-1-get-1-free ice cream and cold beverages.',
+    ctaText: 'Cool Down',
+    ctaLink: '/?q=ice',
+    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
+    textColor: 'text-white',
+    accentColor: 'text-sky-400',
+    illustrationEmoji: '🍦',
+  }
+];
 
 const Home: FC = () => {
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') || '';
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -50,10 +90,6 @@ const Home: FC = () => {
     return () => controller.abort();
   }, []);
 
-  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
-
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredRestaurants = restaurants.filter((r) => {
     const query = normalizedSearchQuery;
@@ -67,32 +103,16 @@ const Home: FC = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Hero Section */}
-      <section className="border-b border-border-default bg-surface py-16 px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-display mb-4 tracking-tight">
-            Discover restaurants near you
-          </h1>
-          <p className="text-body mb-8 text-lg">
-            Get your favorite food delivered directly to your door.
-          </p>
+      {/* Main Content: Restaurant Grid & Promotions */}
+      <SectionContainer width="page" padding="md" className="flex-1 w-full mt-6">
+        
+        {/* Promotional Carousel */}
+        {!hasSearchQuery && (
+           <div className="mb-10 w-full">
+              <PromotionCarousel promotions={MOCK_PROMOTIONS} autoScrollInterval={6000} />
+           </div>
+        )}
 
-          {/* Search UI */}
-          <div className="mx-auto max-w-xl">
-            <Input
-              type="text"
-              placeholder="Search restaurants or cuisines..."
-              aria-label="Search restaurants or cuisines"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="text-center shadow-subtle"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Main Content: Restaurant Grid */}
-      <SectionContainer width="page" padding="md" className="flex-1 w-full">
         <div className="mb-8 flex items-center justify-between">
           <h2 className="text-section-title">
             {hasSearchQuery ? `Search results for "${searchQuery}"` : 'Popular near you'}

@@ -8,6 +8,7 @@ import NotFound from '../pages/NotFound';
 import OrderHistory from '../pages/OrderHistory';
 import Profile from '../pages/Profile';
 import RestaurantDetails from '../pages/RestaurantDetails';
+import Checkout from '../pages/Checkout';
 import IndexRoute from './IndexRoute';
 import ProtectedRoute from './ProtectedRoute';
 
@@ -27,6 +28,7 @@ const AppRouter: React.FC = () => {
           <Route element={<ProtectedRoute />}>
             <Route path="/profile" element={<Profile />} />
             <Route path="/orders" element={<OrderHistory />} />
+            <Route path="/checkout" element={<Checkout />} />
           </Route>
 
           {/* Fallback Route */}
