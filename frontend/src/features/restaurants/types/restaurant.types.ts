@@ -14,6 +14,20 @@ export interface Restaurant {
   is_open_now: boolean;
 }
 
+export interface Cuisine {
+  id: number;
+  name: string;
+}
+
+export type RestaurantOrdering = '' | '-rating' | 'delivery_time' | 'name';
+
+export interface RestaurantFilters {
+  search?: string;
+  cuisine?: number;
+  minRating?: number;
+  ordering?: RestaurantOrdering;
+}
+
 export interface MenuItem {
   id: number;
   category: number;
