@@ -1,4 +1,8 @@
 export interface Profile {
+  id: number;
+  email: string;
+  username: string;
+  role: string;
   phone_number: string | null;
   address: string | null;
 }

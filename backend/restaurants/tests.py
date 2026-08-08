@@ -272,6 +272,61 @@ class RestaurantApiTests(APITestCase):
         self.assertEqual(response.data["opening_hours"], [])
         self.assertEqual(response.data["categories"], [])
 
+    def test_search_matches_restaurant_cuisine_and_menu_item(self):
+        sushi = create_restaurant(name="Sakura", description="Traditional Japanese food")
+        burger_cuisine = Cuisine.objects.create(name="American")
+        burger = create_restaurant(
+            name="Downtown Grill",
+            description="Charcoal classics",
+            cuisine=burger_cuisine,
+        )
+        category = Category.objects.create(name="Mains")
+        MenuItem.objects.create(
+            restaurant=burger,
+            category=category,
+            name="Truffle Burger",
+            price=Decimal("15.00"),
+        )
+
+        for query, expected in (
+            ("Sakura", sushi),
+            ("Japanese", sushi),
+            ("Truffle", burger),
+        ):
+            with self.subTest(query=query):
+                response = self.client.get(self.list_url, {"search": query})
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual([item["id"] for item in response.data], [expected.pk])
+
+    def test_filters_by_cuisine_and_minimum_rating(self):
+        japanese = Cuisine.objects.get_or_create(name="Japanese")[0]
+        american = Cuisine.objects.create(name="American")
+        matching = create_restaurant(
+            name="Top Sushi",
+            cuisine=japanese,
+            rating=Decimal("4.80"),
+        )
+        create_restaurant(name="Low Sushi", cuisine=japanese, rating=Decimal("3.20"))
+        create_restaurant(name="Top Burger", cuisine=american, rating=Decimal("4.90"))
+
+        response = self.client.get(
+            self.list_url,
+            {"cuisine": japanese.pk, "rating__gte": "4.0"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([item["id"] for item in response.data], [matching.pk])
+
+    def test_orders_restaurants_by_supported_fields(self):
+        create_restaurant(name="Slower", rating=Decimal("4.80"), delivery_time=50)
+        faster = create_restaurant(name="Faster", rating=Decimal("4.10"), delivery_time=20)
+
+        fastest_response = self.client.get(self.list_url, {"ordering": "delivery_time"})
+        rating_response = self.client.get(self.list_url, {"ordering": "-rating"})
+
+        self.assertEqual(fastest_response.data[0]["id"], faster.pk)
+        self.assertEqual(rating_response.data[0]["name"], "Slower")
+
 
 class SeedAndMigrationTests(TestCase):
     def test_seed_db_is_idempotent_and_complete(self):

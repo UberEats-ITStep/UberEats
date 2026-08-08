@@ -31,3 +31,6 @@ export * from './Drawer';
 export { default as Drawer } from './Drawer';
 export * from './Modal';
 export { default as Modal } from './Modal';
+
+export * from './Select';
+export { default as Select } from './Select';

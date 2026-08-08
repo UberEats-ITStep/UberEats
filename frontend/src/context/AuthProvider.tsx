@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { authApi } from '../features/auth/api/authApi';
 import type {
@@ -7,10 +7,22 @@ import type {
   RegisterCredentials,
 } from '../features/auth/types/auth.types';
 import { AuthContext } from './AuthContext';
+import { AUTH_LOGOUT_EVENT } from '../api/client';
 
 export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const clearSession = useCallback(() => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setProfile(null);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener(AUTH_LOGOUT_EVENT, clearSession);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, clearSession);
+  }, [clearSession]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -20,15 +32,14 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
           const currentProfile = await authApi.getProfile();
           setProfile(currentProfile);
         } catch {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
+          clearSession();
         }
       }
       setIsLoading(false);
     };
 
     initAuth();
-  }, []);
+  }, [clearSession]);
 
   const login = async (credentials: LoginCredentials) => {
     const { access, refresh } = await authApi.login(credentials);
@@ -39,8 +50,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
       const currentProfile = await authApi.getProfile();
       setProfile(currentProfile);
     } catch (error) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+      clearSession();
       throw error;
     }
   };
@@ -51,9 +61,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setProfile(null);
+    clearSession();
   };
 
   return (
