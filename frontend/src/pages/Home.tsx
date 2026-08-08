@@ -47,14 +47,13 @@ const MOCK_PROMOTIONS: Promotion[] = [
 ];
 
 const EMPTY_FILTERS: RestaurantFilterValues = {
-  search: '',
   cuisine: '',
   minRating: '',
   ordering: '',
 };
 
 const Home: FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState<RestaurantFilterValues>(EMPTY_FILTERS);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [cuisines, setCuisines] = useState<Cuisine[]>([]);
@@ -108,14 +107,10 @@ const Home: FC = () => {
 
   const updateFilters = (nextFilters: RestaurantFilterValues) => {
     setFilters(nextFilters);
-    const nextParams = new URLSearchParams();
-    if (nextFilters.search) nextParams.set('q', nextFilters.search);
-    setSearchParams(nextParams, { replace: true });
   };
 
   const clearFilters = () => {
     setFilters(EMPTY_FILTERS);
-    setSearchParams({}, { replace: true });
   };
 
   return (
@@ -127,15 +122,17 @@ const Home: FC = () => {
           </div>
         )}
 
-        <RestaurantFilters values={activeFilters} cuisines={cuisines} onChange={updateFilters} onClear={clearFilters} />
-
-        <div className="mb-8 flex items-center justify-between gap-4">
-          <h2 className="text-section-title">{hasFilters ? 'Restaurant results' : 'Popular near you'}</h2>
-          {!isLoading && !requestError && (
-            <span className="text-sm text-text-secondary" aria-live="polite">
-              {restaurants.length} {restaurants.length === 1 ? 'restaurant' : 'restaurants'}
-            </span>
-          )}
+        <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-border-default pb-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-section-title">{hasFilters ? 'Restaurant results' : 'Popular near you'}</h2>
+            {!isLoading && !requestError && (
+              <span className="text-sm font-medium text-text-secondary bg-surface-muted px-2.5 py-1 rounded-md" aria-live="polite">
+                {restaurants.length} {restaurants.length === 1 ? 'restaurant' : 'restaurants'}
+              </span>
+            )}
+          </div>
+          
+          <RestaurantFilters values={activeFilters} cuisines={cuisines} onChange={updateFilters} onClear={clearFilters} />
         </div>
 
         {isLoading ? (
