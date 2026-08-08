@@ -1,5 +1,10 @@
 import apiClient from '../../../api/client';
-import type { Restaurant, RestaurantDetails } from '../types/restaurant.types';
+import type {
+  Cuisine,
+  Restaurant,
+  RestaurantDetails,
+  RestaurantFilters,
+} from '../types/restaurant.types';
 
 interface PaginatedResponse<T> {
   count: number;
@@ -9,12 +14,28 @@ interface PaginatedResponse<T> {
 }
 
 export const restaurantService = {
-  async getRestaurants(signal?: AbortSignal): Promise<Restaurant[]> {
-    const response = await apiClient.get<Restaurant[] | PaginatedResponse<Restaurant>>('/restaurants/', { signal });
+  async getRestaurants(filters: RestaurantFilters = {}, signal?: AbortSignal): Promise<Restaurant[]> {
+    const params = {
+      search: filters.search?.trim() || undefined,
+      cuisine: filters.cuisine,
+      rating__gte: filters.minRating,
+      ordering: filters.ordering || undefined,
+    };
+    const response = await apiClient.get<Restaurant[] | PaginatedResponse<Restaurant>>('/restaurants/', {
+      params,
+      signal,
+    });
     if (response.data && 'results' in response.data && Array.isArray(response.data.results)) {
       return response.data.results;
     }
     return response.data as Restaurant[];
+  },
+  async getCuisines(signal?: AbortSignal): Promise<Cuisine[]> {
+    const response = await apiClient.get<Cuisine[] | PaginatedResponse<Cuisine>>('/cuisines/', { signal });
+    if (response.data && 'results' in response.data && Array.isArray(response.data.results)) {
+      return response.data.results;
+    }
+    return response.data as Cuisine[];
   },
   async getRestaurantDetails(
     restaurantId: number,

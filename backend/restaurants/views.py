@@ -22,9 +22,17 @@ class StandardPagination(PageNumberPagination):
 class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = RestaurantListSerializer
     pagination_class = None
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        "cuisine": ["exact"],
+        "rating": ["gte"],
+    }
+    search_fields = ["name", "description", "cuisine__name", "menu_items__name"]
+    ordering_fields = ["rating", "delivery_time", "name"]
+    ordering = ["id"]
 
     def get_queryset(self):
-        queryset = Restaurant.objects.order_by("id").select_related("cuisine").prefetch_related("opening_hours")
+        queryset = Restaurant.objects.select_related("cuisine").prefetch_related("opening_hours")
 
         if self.action == "retrieve":
             return queryset.prefetch_related(
