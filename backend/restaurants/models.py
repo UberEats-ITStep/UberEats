@@ -3,13 +3,26 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.conf import settings
+from .validators import validate_image_extension, validate_image_integrity, validate_image_size
 
+
+
+DEFAULT_RESTAURANT_IMAGE_URL = getattr(
+    settings, "DEFAULT_RESTAURANT_IMAGE_URL", "/static/images/placeholders/restaurant.png"
+)
+DEFAULT_MENU_ITEM_IMAGE_URL = getattr(
+    settings, "DEFAULT_MENU_ITEM_IMAGE_URL", "/static/images/placeholders/menu_item.png"
+)
+IMAGE_VALIDATORS = [validate_image_extension, validate_image_size, validate_image_integrity]
 
 class Cuisine(models.Model):
     name = models.CharField(max_length=255, unique=True)
 
     def __str__(self) -> str:
         return self.name
+
+    
 
 
 class Category(models.Model):
@@ -22,6 +35,12 @@ class Category(models.Model):
 class Restaurant(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
+    image = models.ImageField(
+        upload_to="restaurants/%Y/%m/",
+        null=True,
+        blank=True,
+        validators=IMAGE_VALIDATORS,
+    )
     image_url = models.CharField(max_length=500, blank=True, default="")
     address = models.TextField(blank=True, default="")
     latitude = models.DecimalField(
@@ -53,6 +72,17 @@ class Restaurant(models.Model):
             raise ValidationError(
                 "Latitude and longitude must both be set, or both be empty."
             )
+
+    @property
+    def resolved_image_url(self) -> str:
+        if self.image:
+            try:
+                return self.image.url
+            except ValueError:
+                pass
+        if self.image_url:
+            return self.image_url
+        return DEFAULT_RESTAURANT_IMAGE_URL
 
     @property
     def is_open_now(self) -> bool:
@@ -127,7 +157,13 @@ class MenuItem(models.Model):
         max_digits=10, decimal_places=2,
         validators=[MinValueValidator(0.01)],
     )
-    image = models.ImageField(upload_to="menu_items/%Y/%m/", null=True, blank=True)
+    image = models.ImageField(
+        upload_to="menu_items/%Y/%m/",
+        null=True,
+        blank=True,
+        validators=IMAGE_VALIDATORS,
+    )
+    image_url = models.CharField(max_length=500, blank=True, default="")
 
     is_available = models.BooleanField(default=True)
     unavailable_reason = models.CharField(max_length=255, blank=True, default="")
@@ -151,6 +187,17 @@ class MenuItem(models.Model):
     def clean(self):
         if self.price is not None and self.price <= 0:
             raise ValidationError({"price": "Price must be greater than zero."})
+
+    @property
+    def resolved_image_url(self) -> str:
+        if self.image:
+            try:
+                return self.image.url
+            except ValueError:
+                pass
+        if self.image_url:
+            return self.image_url
+        return DEFAULT_MENU_ITEM_IMAGE_URL
 
     def save(self, *args, **kwargs):
         if not self.slug:

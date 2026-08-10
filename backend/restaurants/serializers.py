@@ -1,7 +1,25 @@
 from rest_framework import serializers
 
-from .models import Category, Cuisine, MenuItem, Restaurant, OpeningHours
+from .models import (
+    Category, Cuisine, DEFAULT_MENU_ITEM_IMAGE_URL,
+    DEFAULT_RESTAURANT_IMAGE_URL, MenuItem, OpeningHours, Restaurant,
+)
 
+class ImageURLMixin:
+    def _resolve_image_url(self, file_field, legacy_url, default_url):
+        request = self.context.get("request")
+        if file_field:
+            try:
+                url = file_field.url
+            except ValueError:
+                url = None
+            if url:
+                return request.build_absolute_uri(url) if request else url
+        if legacy_url:
+            return legacy_url
+        if default_url and request:
+            return request.build_absolute_uri(default_url)
+        return default_url
 
 class CuisineSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,7 +33,9 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class MenuItemSerializer(serializers.ModelSerializer):
+class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = MenuItem
         fields = (
@@ -33,14 +53,18 @@ class MenuItemSerializer(serializers.ModelSerializer):
             "calories",
         )
 
+    def get_image(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
+
     def validate_price(self, value):
         if value <= 0:
             raise serializers.ValidationError("Price must be greater than zero.")
         return value
 
 
-class RestaurantMenuItemSerializer(serializers.ModelSerializer):
+class RestaurantMenuItemSerializer(ImageURLMixin,serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
@@ -56,10 +80,14 @@ class RestaurantMenuItemSerializer(serializers.ModelSerializer):
             "unavailable_reason",
         )
 
+    def get_image(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
 
-class RestaurantListSerializer(serializers.ModelSerializer):
+
+class RestaurantListSerializer(ImageURLMixin,serializers.ModelSerializer):
     cuisine_name = serializers.CharField(source="cuisine.name", read_only=True)
     is_open_now = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Restaurant
@@ -79,6 +107,9 @@ class RestaurantListSerializer(serializers.ModelSerializer):
             "is_open_now",
         )
 
+    def get_image_url(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
+
     def get_is_open_now(self, obj):
         return obj.is_open_now
 
@@ -95,7 +126,7 @@ class RestaurantListSerializer(serializers.ModelSerializer):
 RestaurantSerializer = RestaurantListSerializer
 
 
-class RestaurantDetailSerializer(serializers.ModelSerializer):
+class RestaurantDetailSerializer(ImageURLMixin, serializers.ModelSerializer):
     cuisine_name = serializers.CharField(source="cuisine.name", read_only=True)
     is_open_now = serializers.SerializerMethodField()
     categories = serializers.SerializerMethodField()
@@ -116,10 +147,12 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
                 }
 
             grouped_categories[category_id]["menu_items"].append(
-                RestaurantMenuItemSerializer(item).data
+                RestaurantMenuItemSerializer(item, context=self.context).data
             )
 
         return list(grouped_categories.values())
+    
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Restaurant
@@ -140,6 +173,8 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
             "categories",
         )
 
+    def get_image_url(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_RESTAURANT_IMAGE_URL)
 
 class OpeningHoursSerializer(serializers.ModelSerializer):
     class Meta:
