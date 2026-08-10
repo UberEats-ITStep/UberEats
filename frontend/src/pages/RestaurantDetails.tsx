@@ -8,6 +8,7 @@ import MenuSection from '../features/restaurants/components/MenuSection';
 import { LoadingState, Alert, Button, SectionContainer } from '../components/common';
 import { useCart } from '../context/CartContext';
 import type { MenuItem } from '../features/restaurants/types/restaurant.types';
+import ReviewList from '../features/reviews/components/ReviewList';
 
 const RestaurantDetails: FC = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
@@ -70,6 +71,11 @@ const RestaurantDetails: FC = () => {
         </div>
 
         <MenuSection categories={restaurant.categories} onAddToCart={handleAddToCart} />
+        
+        {/* Customer Reviews Section */}
+        <div className="mt-16 border-t border-border-default">
+          <ReviewList restaurant={restaurant} onReviewChange={() => reload(true)} />
+        </div>
       </main>
     </SectionContainer>
   );

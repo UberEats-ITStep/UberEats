@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { orderService } from '../features/orders/api/order.service';
 import { Button, Input, SectionContainer, EmptyState, Alert, Card, FormField } from '../components/common';
 import OrderSummaryList, { type SummaryItem } from '../features/orders/components/OrderSummaryList';
+import OrderPlacementAnimation from '../features/orders/components/OrderPlacementAnimation';
 import { formatPrice } from '../utils/currency';
 
 const Checkout: FC = () => {
@@ -17,6 +18,14 @@ const Checkout: FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  if (isSubmitting || showSuccess) {
+    return (
+      <SectionContainer width="content" padding="lg" className="min-h-[70vh] flex items-center justify-center">
+        <OrderPlacementAnimation isSuccess={showSuccess} />
+      </SectionContainer>
+    );
+  }
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -76,12 +85,6 @@ const Checkout: FC = () => {
 
       <h1 className="text-page-title mb-8">Checkout</h1>
 
-      {showSuccess && (
-        <div className="mb-8">
-          <Alert variant="success" title="Success!" message="Your order has been placed. Redirecting..." />
-        </div>
-      )}
-
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         
         {/* Checkout Form */}
@@ -103,7 +106,6 @@ const Checkout: FC = () => {
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="123 Main St, Apt 4B"
                   required
-                  disabled={isSubmitting || showSuccess}
                 />
               </FormField>
             </form>
@@ -152,9 +154,8 @@ const Checkout: FC = () => {
                 variant="accent"
                 fullWidth
                 size="lg"
-                disabled={isSubmitting || showSuccess}
               >
-                {isSubmitting ? 'Placing Order...' : 'Place Order'}
+                Place Order
               </Button>
             </Card>
           </div>

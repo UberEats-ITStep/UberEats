@@ -37,17 +37,17 @@ const OrderHistory: FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [requestError, setRequestError] = useState<string | null>(null);
 
-    const loadOrders = useCallback(async () => {
-        setIsLoading(true);
-        setRequestError(null);
+    const loadOrders = useCallback(async (silent = false) => {
+        if (!silent) setIsLoading(true);
+        if (!silent) setRequestError(null);
 
         try {
             const data = await orderService.getOrderHistory();
             setOrders(data);
         } catch {
-            setRequestError('We could not load your orders right now. Please try again.');
+            if (!silent) setRequestError('We could not load your orders right now. Please try again.');
         } finally {
-            setIsLoading(false);
+            if (!silent) setIsLoading(false);
         }
     }, []);
 
@@ -75,6 +75,24 @@ const OrderHistory: FC = () => {
 
         return () => controller.abort();
     }, []);
+
+    // Polling effect for active orders
+    useEffect(() => {
+        const hasActiveOrders = orders.some(o => 
+            o.status !== 'Completed' && 
+            o.status !== 'Cancelled' && 
+            (o.status as string).toUpperCase() !== 'COMPLETED' && 
+            (o.status as string).toUpperCase() !== 'CANCELLED'
+        );
+
+        if (!hasActiveOrders) return;
+
+        const intervalId = setInterval(() => {
+            void loadOrders(true);
+        }, 10000);
+
+        return () => clearInterval(intervalId);
+    }, [orders, loadOrders]);
 
     return (
         <SectionContainer width="content" padding="lg" className="pb-16">

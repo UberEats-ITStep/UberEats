@@ -6,7 +6,7 @@ export interface UseRestaurantDetailsReturn {
   restaurant: RestaurantDetails | null;
   isLoading: boolean;
   error: string | null;
-  reload: () => void;
+  reload: (silent?: boolean) => void;
 }
 
 export const useRestaurantDetails = (restaurantId?: string): UseRestaurantDetailsReturn => {
@@ -49,9 +49,9 @@ export const useRestaurantDetails = (restaurantId?: string): UseRestaurantDetail
     return () => controller.abort();
   }, [isValidId, numericRestaurantId]);
 
-  const reload = useCallback(() => {
+  const reload = useCallback((silent = false) => {
     if (!isValidId) return;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     setError(null);
 
     const reloadData = async () => {
@@ -60,9 +60,9 @@ export const useRestaurantDetails = (restaurantId?: string): UseRestaurantDetail
         setRestaurant(data);
         setError(null);
       } catch {
-        setError('We could not load this restaurant right now. Please try again.');
+        if (!silent) setError('We could not load this restaurant right now. Please try again.');
       } finally {
-        setIsLoading(false);
+        if (!silent) setIsLoading(false);
       }
     };
 

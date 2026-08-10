@@ -145,3 +145,61 @@ class OrderCheckoutApiTests(APITestCase):
         order.refresh_from_db()
         self.assertEqual(order.status, Order.STATUS_ACCEPTED)
         
+from unittest.mock import patch
+from .simulation import simulate_order_lifecycle
+
+class OrderSimulationTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='simuser', 
+            email='sim@example.com', 
+            password='pwd'
+        )
+        self.cuisine = Cuisine.objects.create(name='Mexican')
+        self.restaurant = Restaurant.objects.create(name='Taco Place', cuisine=self.cuisine)
+        self.category = Category.objects.create(name='Tacos')
+        self.menu_item = MenuItem.objects.create(
+            restaurant=self.restaurant, 
+            category=self.category, 
+            name='Taco', 
+            price=Decimal('5.00')
+        )
+        
+    def create_order(self):
+        order = Order.objects.create(
+            client=self.user, 
+            restaurant=self.restaurant, 
+            total_price=self.menu_item.price
+        )
+        OrderItem.objects.create(
+            order=order, 
+            menu_item=self.menu_item, 
+            quantity=1, 
+            price=self.menu_item.price
+        )
+        return order
+        
+    @patch('orders.simulation.time.sleep', return_value=None)
+    def test_simulation_progresses_order_to_completed(self, mock_sleep):
+        order = self.create_order()
+        self.assertEqual(order.status, Order.STATUS_PENDING)
+        
+        # Run simulation synchronously for testing
+        simulate_order_lifecycle(order.id)
+        
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS_COMPLETED)
+        
+    @patch('orders.simulation.time.sleep', return_value=None)
+    def test_simulation_stops_if_externally_modified(self, mock_sleep):
+        order = self.create_order()
+        
+        # Modify externally before running
+        order.status = Order.STATUS_CANCELLED
+        order.save()
+        
+        simulate_order_lifecycle(order.id)
+        
+        order.refresh_from_db()
+        self.assertEqual(order.status, Order.STATUS_CANCELLED)
+
