@@ -1,10 +1,195 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@theme {
+  /* --- Brand Colors --- */
+  --color-primary: #0F1633;
+  --color-primary-hover: #1B2447;
+  --color-primary-active: #090D1F;
+  
+  /* --- Supporting Colors --- */
+  --color-secondary: #F1F5F9;
+  --color-accent: #FF8C00;
+  --color-accent-hover: #E07B00;
+  
+  /* --- Surfaces --- */
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-card: #FFFFFF;
+  --color-muted: #F1F5F9;
+  --color-surface-muted: #F1F5F9;
+  
+  /* --- Text Colors --- */
+  --color-text-primary: #0F1633;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-text-inverse: #FFFFFF;
+  
+  /* --- Border Colors --- */
+  --color-border-default: #E2E8F0;
+  --color-border-focus: #0F1633;
+  --color-border-subtle: #F1F5F9;
+  --color-default: #E2E8F0;
+  --color-focus: #0F1633;
+  --color-subtle: #F1F5F9;
+  
+  /* --- Status Colors --- */
+  --color-status-success: #10B981;
+  --color-status-success-muted: #D1FAE5;
+  --color-status-warning: #F59E0B;
+  --color-status-warning-muted: #FEF3C7;
+  --color-status-error: #EF4444;
+  --color-status-error-muted: #FEE2E2;
+  --color-status-info: #3B82F6;
+  --color-status-info-muted: #DBEAFE;
+
+  /* --- Typography --- */
+  --font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+
+  /* --- Radius Scale --- */
+  --radius-sm: 0.5rem;      /* 8px: buttons, inputs, small tags */
+  --radius-md: 0.75rem;     /* 12px: dropdowns, modals, small cards */
+  --radius-lg: 1rem;        /* 16px: standard cards */
+  --radius-xl: 1.5rem;      /* 24px: large hero banners, feature sections */
+  --radius-full: 9999px;    /* pills, badges, avatars */
+
+  /* --- Shadows & Elevation --- */
+  --shadow-subtle: 0 1px 3px 0 rgb(15 22 51 / 0.05), 0 1px 2px -1px rgb(15 22 51 / 0.05);
+  --shadow-elevated: 0 10px 15px -3px rgb(15 22 51 / 0.08), 0 4px 6px -4px rgb(15 22 51 / 0.04);
+  --shadow-floating: 0 20px 25px -5px rgb(15 22 51 / 0.12), 0 8px 10px -6px rgb(15 22 51 / 0.04);
+
+  /* --- Custom Animations --- */
+  --animate-fade-in: fade-in 0.4s ease-out;
+  --animate-pop: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  
+  @keyframes pop {
+    0% { transform: scale(0.5); opacity: 0; }
+    80% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+}
+
+/* --- Global Body & Reset --- */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Reusable Typography Utilities --- */
+@utility text-display {
+  font-family: var(--font-sans);
+  font-size: 2.25rem;
+  line-height: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--color-text-primary);
+}
+
+@utility text-page-title {
+  font-family: var(--font-sans);
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--color-text-primary);
+}
+
+@utility text-section-title {
+  font-family: var(--font-sans);
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--color-text-primary);
+}
+
+@utility text-body {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  color: var(--color-text-secondary);
+}
+
+@utility text-caption {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+@utility text-label {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+@utility text-button {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* --- Reusable Layout Utilities --- */
+.container-page {
+  width: 100%;
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+@media (min-width: 640px) {
+  .container-page {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .container-page {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.container-content {
+  width: 100%;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.container-auth {
+  width: 100%;
+  max-width: 28rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* --- Reusable Motion Timing --- */
+.transition-base {
+  transition-property: all;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-card {
+  transition-property: all;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
 }

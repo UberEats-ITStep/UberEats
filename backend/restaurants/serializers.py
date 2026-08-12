@@ -5,6 +5,7 @@ from .models import (
     DEFAULT_RESTAURANT_IMAGE_URL, MenuItem, OpeningHours, Restaurant,
 )
 
+
 class ImageURLMixin:
     def _resolve_image_url(self, file_field, legacy_url, default_url):
         request = self.context.get("request")
@@ -20,6 +21,7 @@ class ImageURLMixin:
         if default_url and request:
             return request.build_absolute_uri(default_url)
         return default_url
+
 
 class CuisineSerializer(serializers.ModelSerializer):
     class Meta:
@@ -51,6 +53,7 @@ class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
             "is_vegetarian",
             "is_vegan",
             "calories",
+            "slug",
         )
 
     def get_image(self, obj):
@@ -61,8 +64,26 @@ class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
             raise serializers.ValidationError("Price must be greater than zero.")
         return value
 
+    def validate(self, data):
+        is_available = data.get(
+            "is_available", getattr(self.instance, "is_available", True)
+        )
+        reason = data.get(
+            "unavailable_reason",
+            getattr(self.instance, "unavailable_reason", ""),
+        )
+        if is_available and reason:
+            raise serializers.ValidationError({
+                "unavailable_reason": "Available items cannot have an unavailable reason."
+            })
+        if not is_available and not reason.strip():
+            raise serializers.ValidationError({
+                "unavailable_reason": "Unavailable items must include a reason."
+            })
+        return data
 
-class RestaurantMenuItemSerializer(ImageURLMixin,serializers.ModelSerializer):
+
+class RestaurantMenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     image = serializers.SerializerMethodField()
 
@@ -78,13 +99,17 @@ class RestaurantMenuItemSerializer(ImageURLMixin,serializers.ModelSerializer):
             "image",
             "is_available",
             "unavailable_reason",
+            "is_vegetarian",
+            "is_vegan",
+            "calories",
+            "slug",
         )
 
     def get_image(self, obj):
         return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
 
 
-class RestaurantListSerializer(ImageURLMixin,serializers.ModelSerializer):
+class RestaurantListSerializer(ImageURLMixin, serializers.ModelSerializer):
     cuisine_name = serializers.CharField(source="cuisine.name", read_only=True)
     is_open_now = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
@@ -108,31 +133,72 @@ class RestaurantListSerializer(ImageURLMixin,serializers.ModelSerializer):
         )
 
     def get_image_url(self, obj):
-        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_RESTAURANT_IMAGE_URL)
 
     def get_is_open_now(self, obj):
         return obj.is_open_now
 
     def validate(self, data):
-        lat = data.get("latitude")
-        lng = data.get("longitude")
+        lat = data.get("latitude", getattr(self.instance, "latitude", None))
+        lng = data.get("longitude", getattr(self.instance, "longitude", None))
         if (lat is None) != (lng is None):
-            raise serializers.ValidationError(
-                "Latitude and longitude must both be set, or both be empty."
-            )
+            missing_field = "longitude" if lng is None else "latitude"
+            raise serializers.ValidationError({
+                missing_field: "Latitude and longitude must both be set, or both be empty."
+            })
         return data
 
 
 RestaurantSerializer = RestaurantListSerializer
 
 
+class OpeningHoursSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OpeningHours
+        fields = ("id", "day_type", "opens_at", "closes_at")
+
+    def validate(self, data):
+        opens_at = data.get("opens_at", getattr(self.instance, "opens_at", None))
+        closes_at = data.get("closes_at", getattr(self.instance, "closes_at", None))
+        if opens_at == closes_at:
+            raise serializers.ValidationError({
+                "closes_at": "Closing time must differ from opening time."
+            })
+        return data
+
+
 class RestaurantDetailSerializer(ImageURLMixin, serializers.ModelSerializer):
     cuisine_name = serializers.CharField(source="cuisine.name", read_only=True)
     is_open_now = serializers.SerializerMethodField()
     categories = serializers.SerializerMethodField()
+    opening_hours = OpeningHoursSerializer(many=True, read_only=True)
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Restaurant
+        fields = (
+            "id",
+            "name",
+            "description",
+            "image_url",
+            "address",
+            "latitude",
+            "longitude",
+            "cuisine",
+            "cuisine_name",
+            "rating",
+            "review_count",
+            "delivery_time",
+            "is_open_now",
+            "opening_hours",
+            "categories",
+        )
 
     def get_is_open_now(self, obj):
         return obj.is_open_now
+
+    def get_image_url(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_RESTAURANT_IMAGE_URL)
 
     def get_categories(self, obj):
         grouped_categories = {}
@@ -151,32 +217,3 @@ class RestaurantDetailSerializer(ImageURLMixin, serializers.ModelSerializer):
             )
 
         return list(grouped_categories.values())
-    
-    image_url = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Restaurant
-        fields = (
-            "id",
-            "name",
-            "description",
-            "image_url",
-            "address",
-            "latitude",
-            "longitude",
-            "cuisine",
-            "cuisine_name",
-            "rating",
-            "review_count",
-            "delivery_time",
-            "is_open_now",
-            "categories",
-        )
-
-    def get_image_url(self, obj):
-        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_RESTAURANT_IMAGE_URL)
-
-class OpeningHoursSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OpeningHours
-        fields = "__all__"

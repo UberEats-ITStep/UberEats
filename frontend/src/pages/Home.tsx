@@ -1,136 +1,156 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { FC, ChangeEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { FC } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import RestaurantCard from '../features/restaurants/components/RestaurantCard';
+import RestaurantFilters from '../features/restaurants/components/RestaurantFilters';
+import type { RestaurantFilterValues } from '../features/restaurants/components/RestaurantFilters';
 import { restaurantService } from '../features/restaurants/api/restaurant.service';
-import type { Restaurant } from '../features/restaurants/types/restaurant.types';
+import type { Cuisine, Restaurant } from '../features/restaurants/types/restaurant.types';
+import { SectionContainer, LoadingState, EmptyState, Alert } from '../components/common';
+import PromotionCarousel from '../features/home/components/PromotionCarousel';
+import type { Promotion } from '../features/home/types/promotion.types';
+
+const MOCK_PROMOTIONS: Promotion[] = [
+  {
+    id: 1,
+    title: 'Free Delivery Weekend',
+    description: 'Enjoy free delivery on all orders over $20 this weekend only!',
+    ctaText: 'Order Now',
+    ctaLink: '/restaurants',
+    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
+    textColor: 'text-white',
+    accentColor: 'text-accent',
+    illustrationEmoji: '🛵',
+  },
+  {
+    id: 2,
+    title: '20% Off Sushi',
+    description: 'Craving sushi? Get a sweet 20% discount on top-rated sushi places.',
+    ctaText: 'Find Sushi',
+    ctaLink: '/?q=sushi',
+    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
+    textColor: 'text-white',
+    accentColor: 'text-rose-500',
+    illustrationEmoji: '🍣',
+  },
+  {
+    id: 3,
+    title: 'Summer Deals',
+    description: 'Cool down with buy-1-get-1-free ice cream and cold beverages.',
+    ctaText: 'Cool Down',
+    ctaLink: '/?q=ice',
+    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
+    textColor: 'text-white',
+    accentColor: 'text-sky-400',
+    illustrationEmoji: '🍦',
+  },
+];
+
+const EMPTY_FILTERS: RestaurantFilterValues = {
+  cuisine: '',
+  minRating: '',
+  ordering: '',
+};
 
 const Home: FC = () => {
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState<RestaurantFilterValues>(EMPTY_FILTERS);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [cuisines, setCuisines] = useState<Cuisine[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const loadRestaurants = useCallback(async () => {
-    setIsLoading(true);
-    setRequestError(null);
+  const activeFilters = useMemo(() => ({
+    ...filters,
+    search: searchParams.get('q') ?? '',
+  }), [filters, searchParams]);
 
-    try {
-      const data = await restaurantService.getRestaurants();
-      setRestaurants(data);
-    } catch {
-      setRequestError('We could not load restaurants right now. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+  useEffect(() => {
+    const controller = new AbortController();
+    void restaurantService.getCuisines(controller.signal)
+      .then(setCuisines)
+      .catch(() => undefined);
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setIsLoading(true);
+      setRequestError(null);
 
-    const loadInitialRestaurants = async () => {
       try {
-        const data = await restaurantService.getRestaurants(controller.signal);
-        if (!controller.signal.aborted) {
-          setRestaurants(data);
-        }
+        const data = await restaurantService.getRestaurants({
+          search: activeFilters.search,
+          cuisine: activeFilters.cuisine ? Number(activeFilters.cuisine) : undefined,
+          minRating: activeFilters.minRating ? Number(activeFilters.minRating) : undefined,
+          ordering: activeFilters.ordering,
+        }, controller.signal);
+        setRestaurants(data);
       } catch {
         if (!controller.signal.aborted) {
           setRequestError('We could not load restaurants right now. Please try again.');
         }
       } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
+        if (!controller.signal.aborted) setIsLoading(false);
       }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
     };
+  }, [activeFilters, retryCount]);
 
-    void loadInitialRestaurants();
+  const hasFilters = useMemo(() => Object.values(activeFilters).some(Boolean), [activeFilters]);
 
-    return () => controller.abort();
-  }, []);
-
-  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+  const updateFilters = (nextFilters: RestaurantFilterValues) => {
+    setFilters(nextFilters);
   };
 
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const filteredRestaurants = restaurants.filter((r) => {
-    const query = normalizedSearchQuery;
-    return (
-      (r.name || '').toLowerCase().includes(query) ||
-      (r.description || '').toLowerCase().includes(query) ||
-      (r.cuisine_name || '').toLowerCase().includes(query)
-    );
-  });
-  const hasSearchQuery = normalizedSearchQuery.length > 0;
+  const clearFilters = () => {
+    setFilters(EMPTY_FILTERS);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      {/* Hero Section */}
-      <section className="bg-gray-50 py-16 px-4 sm:px-6 lg:px-8 border-b border-gray-200">
-        <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight mb-4">
-            Discover restaurants near you
-          </h1>
-          <p className="text-lg text-gray-600 mb-8">
-            Get your favorite food delivered directly to your door.
-          </p>
-
-          {/* Search UI */}
-          <div className="flex flex-col sm:flex-row items-center justify-center max-w-xl mx-auto space-y-3 sm:space-y-0 sm:space-x-3">
-            <input
-              type="text"
-              placeholder="Search restaurants or cuisines"
-              aria-label="Search restaurants or cuisines"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 text-center"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Main Content: Restaurant Grid */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
-        <div className="mb-8 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {hasSearchQuery ? `Search results for "${searchQuery}"` : 'Popular near you'}
-          </h2>
-        </div>
-
-        {/* Data States */}
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center text-gray-600" role="status">
-            <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-green-600" />
-            <p>Loading restaurants near you...</p>
-          </div>
-        ) : requestError ? (
-          <div className="rounded-lg bg-red-50 px-6 py-10 text-center" role="alert">
-            <p className="text-gray-700">{requestError}</p>
-            <button
-              type="button"
-              onClick={() => void loadRestaurants()}
-              className="mt-4 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-            >
-              Try again
-            </button>
-          </div>
-        ) : restaurants.length === 0 ? (
-          <div className="text-center py-20 text-gray-500 bg-gray-50 rounded-lg">
-            No restaurants are available yet. Please check back soon.
-          </div>
-        ) : filteredRestaurants.length === 0 ? (
-          <div className="text-center py-20 text-gray-500 bg-gray-50 rounded-lg">
-            No restaurants found matching your search.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredRestaurants.map((restaurant) => (
-              <RestaurantCard key={restaurant.id} restaurant={restaurant} />
-            ))}
+    <div className="flex min-h-screen flex-col bg-background">
+      <SectionContainer width="page" padding="md" className="mt-6 w-full flex-1">
+        {!hasFilters && (
+          <div className="mb-10 w-full">
+            <PromotionCarousel promotions={MOCK_PROMOTIONS} autoScrollInterval={6000} />
           </div>
         )}
-      </main>
+
+        <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-border-default pb-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-section-title">{hasFilters ? 'Restaurant results' : 'Popular near you'}</h2>
+            {!isLoading && !requestError && (
+              <span className="text-sm font-medium text-text-secondary bg-surface-muted px-2.5 py-1 rounded-md" aria-live="polite">
+                {restaurants.length} {restaurants.length === 1 ? 'restaurant' : 'restaurants'}
+              </span>
+            )}
+          </div>
+          
+          <RestaurantFilters values={activeFilters} cuisines={cuisines} onChange={updateFilters} onClear={clearFilters} />
+        </div>
+
+        {isLoading ? (
+          <LoadingState message="Finding restaurants for you..." />
+        ) : requestError ? (
+          <Alert variant="error" title="Unable to load restaurants" message={requestError} onRetry={() => setRetryCount((count) => count + 1)} />
+        ) : restaurants.length === 0 ? (
+          <EmptyState
+            title={hasFilters ? 'No matches found' : 'No restaurants available'}
+            description={hasFilters ? 'Try a different search or clear one of your filters.' : 'We are currently expanding in your area. Please check back soon!'}
+            action={hasFilters ? <button type="button" onClick={clearFilters} className="text-button text-primary underline decoration-accent decoration-2 underline-offset-4">Clear filters</button> : undefined}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {restaurants.map((restaurant) => <RestaurantCard key={restaurant.id} restaurant={restaurant} />)}
+          </div>
+        )}
+      </SectionContainer>
     </div>
   );
 };

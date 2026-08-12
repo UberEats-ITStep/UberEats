@@ -8,31 +8,31 @@ export interface RestaurantStatsProps {
 const RestaurantStats: FC<RestaurantStatsProps> = ({ restaurant }) => (
   <section
     aria-label="Restaurant information"
-    className="relative z-10 mx-4 -mt-5 grid gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-md sm:grid-cols-2 lg:mx-8 lg:grid-cols-4"
+    className="relative z-10 mx-4 -mt-5 grid gap-4 rounded-xl border border-border-default bg-card p-5 shadow-elevated sm:grid-cols-2 lg:mx-8 lg:grid-cols-4"
   >
     <div>
-      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Rating</p>
-      <p className="mt-1 font-bold text-[#0B132B]">
-        <span className="text-[#FF8C00]">★</span>{' '}
+      <p className="text-caption">Rating</p>
+      <p className="mt-1 font-bold text-text-primary">
+        <span className="text-accent">★</span>{' '}
         {restaurant.rating != null ? Number(restaurant.rating).toFixed(1) : 'New'}
         {restaurant.review_count > 0 && (
-          <span className="ml-1 font-normal text-gray-500">
+          <span className="ml-1 font-normal text-text-muted">
             ({restaurant.review_count})
           </span>
         )}
       </p>
     </div>
     <div>
-      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Delivery</p>
-      <p className="mt-1 font-bold text-[#0B132B]">
+      <p className="text-caption">Delivery</p>
+      <p className="mt-1 font-bold text-text-primary">
         {restaurant.delivery_time != null
           ? `${restaurant.delivery_time} min`
           : 'Time unavailable'}
       </p>
     </div>
     <div className="sm:col-span-2">
-      <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Address</p>
-      <p className="mt-1 font-bold text-[#0B132B]">
+      <p className="text-caption">Address</p>
+      <p className="mt-1 font-bold text-text-primary">
         {restaurant.address || 'Address unavailable'}
       </p>
     </div>

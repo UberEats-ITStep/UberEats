@@ -12,6 +12,9 @@ class CartViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Cart.objects.filter(user=self.request.user).select_related("restaurant").prefetch_related("items__menu_item")
 
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class CartItemViewSet(viewsets.ModelViewSet):
     serializer_class = CartItemSerializer

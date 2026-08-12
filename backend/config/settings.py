@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -103,6 +104,12 @@ DATABASES = {
     }
 }
 
+if {"test", "makemigrations"} & set(sys.argv):
+    DATABASES["default"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -156,3 +163,12 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+
+# Order Lifecycle Simulation (Development Only)
+# List of tuples: (Target Status, Delay in seconds before transitioning to it)
+ORDER_SIMULATION_TRANSITIONS = [
+    ('PREPARING', 10),
+    ('READY', 10),
+    ('DELIVERING', 10),
+    ('COMPLETED', 10),
+]

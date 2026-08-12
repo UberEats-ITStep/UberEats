@@ -1,6 +1,7 @@
 import { useState, type FC } from 'react';
 import { Link } from 'react-router-dom';
 import type { Restaurant } from '../types/restaurant.types';
+import { Badge } from '../../../components/common';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -13,17 +14,17 @@ const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
   return (
     <Link
       to={`/restaurants/${restaurant.id}`}
-      className="block bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden border border-gray-100 group focus:outline-none focus:ring-2 focus:ring-[#FF8C00] focus:ring-offset-2"
+      className="group block overflow-hidden rounded-xl border border-border-default bg-card shadow-subtle transition-all duration-300 hover:border-border-focus hover:shadow-elevated focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
       aria-label={`View ${restaurant.name} menu`}
     >
       {/* Image container with fixed aspect ratio */}
-      <div className="relative h-48 w-full overflow-hidden bg-[#0B132B]">
+      <div className="relative h-48 w-full overflow-hidden bg-primary">
         {showPlaceholder ? (
-          <div className="w-full h-full bg-gradient-to-br from-[#0B132B] via-[#172344] to-[#FF8C00]/80 flex flex-col items-center justify-center p-4 text-center group-hover:scale-105 transition-transform duration-500">
-            <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center mb-2 text-2xl shadow-inner border border-white/15">
+          <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-primary via-primary-hover to-accent/80 p-4 text-center transition-transform duration-500 group-hover:scale-105">
+            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-2xl shadow-inner backdrop-blur-md">
               🍽️
             </div>
-            <span className="text-white font-bold text-sm tracking-wide opacity-90 truncate max-w-full px-2">
+            <span className="max-w-full truncate px-2 text-sm font-bold tracking-wide text-white opacity-90">
               {restaurant.name}
             </span>
           </div>
@@ -32,35 +33,33 @@ const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant }) => {
             src={restaurant.image_url}
             alt={restaurant.name}
             onError={() => setImageError(true)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         )}
         {/* Delivery Time Badge */}
         {restaurant.delivery_time != null && (
-          <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-bold text-[#0B132B] shadow-md border border-gray-100">
+          <div className="absolute right-3 bottom-3 rounded-full border border-border-default bg-surface/95 px-2.5 py-1 text-xs font-bold text-text-primary shadow-md backdrop-blur-sm">
             {restaurant.delivery_time} min
           </div>
         )}
       </div>
 
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-1">
-          <h3 className="text-lg font-bold text-gray-900 truncate pr-2">{restaurant.name}</h3>
-          <div className="flex items-center bg-gray-100 px-2 py-1 rounded-full shrink-0">
-            <span className="text-[#FF8C00] mr-1 text-sm">★</span>
-            <span className="text-sm font-semibold text-[#0B132B]">
-              {restaurant.rating != null ? Number(restaurant.rating).toFixed(1) : 'New'}
-            </span>
-          </div>
+      <div className="p-5">
+        <div className="mb-1.5 flex items-start justify-between gap-2">
+          <h3 className="truncate text-lg font-bold text-text-primary">{restaurant.name}</h3>
+          <Badge variant="secondary" size="sm" className="shrink-0 bg-secondary font-semibold text-text-primary">
+            <span className="text-accent">★</span>
+            <span>{restaurant.rating != null ? Number(restaurant.rating).toFixed(1) : 'New'}</span>
+          </Badge>
         </div>
 
-        <p className="text-sm text-gray-500 mb-3 line-clamp-2">{restaurant.description}</p>
+        <p className="mb-3 line-clamp-2 text-sm text-text-secondary">{restaurant.description}</p>
 
         <div className="flex flex-wrap gap-2">
           {restaurant.cuisine_name ? (
-            <span className="inline-block px-2 py-1 bg-gray-50 text-gray-600 text-xs font-medium rounded border border-gray-200">
+            <Badge variant="neutral" size="sm">
               {restaurant.cuisine_name}
-            </span>
+            </Badge>
           ) : null}
         </div>
       </div>

@@ -1,16 +1,13 @@
-import React from 'react';
+import type { FC } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { LoadingState } from '../components/common';
 
-const ProtectedRoute: React.FC = () => {
+const ProtectedRoute: FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
+    return <LoadingState message="Verifying session..." fullScreen />;
   }
 
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;

@@ -1,3 +1,6 @@
+from datetime import timedelta
+from decimal import Decimal
+
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
@@ -68,10 +71,12 @@ class Restaurant(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
+        super().clean()
         if (self.latitude is None) != (self.longitude is None):
-            raise ValidationError(
-                "Latitude and longitude must both be set, or both be empty."
-            )
+            missing_field = "longitude" if self.longitude is None else "latitude"
+            raise ValidationError({
+                missing_field: "Latitude and longitude must both be set, or both be empty."
+            })
 
     @property
     def resolved_image_url(self) -> str:
@@ -86,13 +91,26 @@ class Restaurant(models.Model):
 
     @property
     def is_open_now(self) -> bool:
-        time = timezone.localtime()
-        is_weekend = time.weekday() >= 5  # 5=субота, 6=неділя
-        day_type = "weekend" if is_weekend else "weekday"
-        hours = next((h for h in self.opening_hours.all() if h.day_type == day_type), None)
-        if hours is None:
-            return False
-        return hours.opens_at <= time.time() <= hours.closes_at
+        current = timezone.localtime(timezone.now())
+        schedules = {hours.day_type: hours for hours in self.opening_hours.all()}
+        current_type = "weekend" if current.weekday() >= 5 else "weekday"
+        previous_day = current.date() - timedelta(days=1)
+        previous_type = "weekend" if previous_day.weekday() >= 5 else "weekday"
+        current_time = current.time().replace(tzinfo=None)
+
+        hours = schedules.get(current_type)
+        if hours and hours.opens_at < hours.closes_at:
+            if hours.opens_at <= current_time < hours.closes_at:
+                return True
+        elif hours and current_time >= hours.opens_at:
+            return True
+
+        previous_hours = schedules.get(previous_type)
+        return bool(
+            previous_hours
+            and previous_hours.opens_at > previous_hours.closes_at
+            and current_time < previous_hours.closes_at
+        )
 
     def update_rating(self):
         from django.db.models import Avg, Count
@@ -135,6 +153,13 @@ class OpeningHours(models.Model):
             )
         ]
 
+    def clean(self):
+        super().clean()
+        if self.opens_at == self.closes_at:
+            raise ValidationError({
+                "closes_at": "Closing time must differ from opening time."
+            })
+
     def __str__(self) -> str:
         return f"{self.get_day_type_display()}: {self.opens_at}-{self.closes_at}"
 
@@ -155,7 +180,7 @@ class MenuItem(models.Model):
     description = models.TextField(blank=True, default="")
     price = models.DecimalField(
         max_digits=10, decimal_places=2,
-        validators=[MinValueValidator(0.01)],
+        validators=[MinValueValidator(Decimal("0.01"))],
     )
     image = models.ImageField(
         upload_to="menu_items/%Y/%m/",
@@ -185,8 +210,17 @@ class MenuItem(models.Model):
         ]
 
     def clean(self):
+        super().clean()
         if self.price is not None and self.price <= 0:
             raise ValidationError({"price": "Price must be greater than zero."})
+        if self.is_available and self.unavailable_reason:
+            raise ValidationError({
+                "unavailable_reason": "Available items cannot have an unavailable reason."
+            })
+        if not self.is_available and not self.unavailable_reason.strip():
+            raise ValidationError({
+                "unavailable_reason": "Unavailable items must include a reason."
+            })
 
     @property
     def resolved_image_url(self) -> str:
@@ -201,7 +235,16 @@ class MenuItem(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name)
+            base_slug = slugify(self.name) or "menu-item"
+            slug = base_slug
+            suffix = 2
+            existing = type(self).objects.filter(restaurant=self.restaurant)
+            if self.pk:
+                existing = existing.exclude(pk=self.pk)
+            while existing.filter(slug=slug).exists():
+                slug = f"{base_slug}-{suffix}"
+                suffix += 1
+            self.slug = slug
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
