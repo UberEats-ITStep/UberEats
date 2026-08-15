@@ -12,6 +12,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='CLIENT')
     created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
     
     # Require email for authentication
     USERNAME_FIELD = 'email'
@@ -24,6 +25,22 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.user.email} Profile"
+
+from django.utils import timezone
+
+class VerificationCode(models.Model):
+    PURPOSE_CHOICES = (
+        ('EMAIL_VERIFICATION', 'Email Verification'),
+        ('PASSWORD_RESET', 'Password Reset'),
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_codes')
+    purpose = models.CharField(max_length=50, choices=PURPOSE_CHOICES, default='EMAIL_VERIFICATION')
+    code_hash = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    
+    def is_valid(self):
+        return timezone.now() <= self.expires_at
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
