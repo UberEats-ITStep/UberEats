@@ -9,12 +9,12 @@ const CategoryNavbar: FC<CategoryNavbarProps> = ({ categories }) => {
   if (categories.length === 0) return null;
 
   return (
-    <nav aria-label="Menu categories" className="flex gap-2 overflow-x-auto pb-1">
+    <nav aria-label="Menu categories" className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide lg:justify-end">
       {categories.map((category) => (
         <a
           key={category.id}
           href={`#category-${category.id}`}
-          className="whitespace-nowrap rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-text-secondary transition-base hover:bg-primary hover:text-text-inverse"
+          className="whitespace-nowrap border-b-2 border-transparent px-1 py-2 text-sm font-medium tracking-wide text-text-secondary transition-base hover:border-text-primary hover:text-text-primary"
         >
           {category.name}
         </a>

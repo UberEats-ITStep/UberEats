@@ -7,23 +7,23 @@ import type { Order } from '../features/orders/types/order.types';
 import { SectionContainer, EmptyState, Alert, Card, Button } from '../components/common';
 
 const OrderCardSkeleton: FC = () => (
-    <Card elevation="subtle" padding="md" className="animate-pulse">
+    <Card className="animate-pulse p-6 border border-border-default rounded-none">
         <div className="flex gap-4">
-            <div className="h-16 w-16 bg-border-default rounded-md shrink-0"></div>
+            <div className="h-16 w-16 bg-muted rounded-none shrink-0"></div>
             <div className="flex-1 space-y-3 py-1">
-                <div className="h-5 w-1/4 bg-border-default rounded"></div>
-                <div className="h-6 w-1/2 bg-border-default rounded"></div>
-                <div className="h-4 w-1/3 bg-border-default rounded"></div>
+                <div className="h-5 w-1/4 bg-muted rounded-none"></div>
+                <div className="h-6 w-1/2 bg-muted rounded-none"></div>
+                <div className="h-4 w-1/3 bg-muted rounded-none"></div>
             </div>
-            <div className="h-6 w-20 bg-border-default rounded shrink-0"></div>
+            <div className="h-6 w-20 bg-muted rounded-none shrink-0"></div>
         </div>
         <div className="my-5 border-y border-border-default py-4 space-y-3">
-            <div className="h-4 w-3/4 bg-border-default rounded"></div>
-            <div className="h-4 w-1/2 bg-border-default rounded"></div>
+            <div className="h-4 w-3/4 bg-muted rounded-none"></div>
+            <div className="h-4 w-1/2 bg-muted rounded-none"></div>
         </div>
         <div className="flex justify-between items-center">
-            <div className="h-5 w-16 bg-border-default rounded"></div>
-            <div className="h-6 w-24 bg-border-default rounded"></div>
+            <div className="h-5 w-16 bg-muted rounded-none"></div>
+            <div className="h-6 w-24 bg-muted rounded-none"></div>
         </div>
     </Card>
 );
@@ -95,10 +95,10 @@ const OrderHistory: FC = () => {
     }, [orders, loadOrders]);
 
     return (
-        <SectionContainer width="content" padding="lg" className="pb-16">
-            <div className="mb-8">
-                <h1 className="text-page-title">Your orders</h1>
-                <p className="mt-2 text-body">Review your active and previous orders.</p>
+        <SectionContainer width="content" padding="lg" className="pb-16 pt-10">
+            <div className="mb-12 border-b border-text-primary pb-6">
+                <p className="text-sm tracking-widest uppercase text-text-muted mb-2">History</p>
+                <h1 className="text-5xl font-serif italic text-text-primary">Your Orders</h1>
             </div>
 
             {successMessage && (
@@ -108,7 +108,7 @@ const OrderHistory: FC = () => {
             )}
 
             {isLoading ? (
-                <div className="space-y-5">
+                <div className="space-y-6">
                     <OrderCardSkeleton />
                     <OrderCardSkeleton />
                     <OrderCardSkeleton />
@@ -125,13 +125,13 @@ const OrderHistory: FC = () => {
                     title="No orders yet"
                     description="Your completed and active orders will appear here once you place an order. Discover great food around you!"
                     action={
-                      <Button onClick={() => navigate('/restaurants')}>
-                        Browse Restaurants
+                      <Button variant="primary" onClick={() => navigate('/restaurants')}>
+                        Browse Directory
                       </Button>
                     }
                 />
             ) : (
-                <div className="space-y-5">
+                <div className="space-y-8">
                     {orders.map((order) => (
                         <OrderCard key={order.id} order={order} />
                     ))}

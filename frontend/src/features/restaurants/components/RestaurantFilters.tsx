@@ -63,7 +63,7 @@ const RestaurantFilters: FC<RestaurantFiltersProps> = ({ values, cuisines, onCha
       {hasFilters && (
         <button 
           onClick={onClear} 
-          className="ml-2 text-sm font-medium text-text-muted hover:text-accent transition-base"
+          className="ml-2 text-sm font-medium text-text-muted hover:text-text-primary transition-base underline underline-offset-4"
         >
           Clear
         </button>

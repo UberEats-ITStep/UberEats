@@ -87,6 +87,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (cart && cart.restaurant && cart.restaurant !== restaurantId) {
+      if (cart.items.length === 0) {
+        // Transparently clear the stale empty cart and proceed
+        await cartService.deleteCart(cart.id);
+        setCart(null);
+        await processAddToCart(menuItemId, quantity, restaurantId);
+        return;
+      }
+
       setPendingAdd({ menuItemId, quantity, restaurantId });
       setShowClearConfirm(true);
       return;

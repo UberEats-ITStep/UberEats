@@ -51,12 +51,12 @@ const OrderCard: FC<OrderCardProps> = ({ order }) => {
 
     if (isLoading) {
         return (
-            <Card elevation="subtle" padding="md" className="animate-pulse">
+            <Card className="animate-pulse p-6 border border-border-default rounded-none">
                 <div className="flex gap-4">
-                    <div className="h-16 w-16 bg-border-default rounded-md"></div>
+                    <div className="h-16 w-16 bg-muted rounded-none"></div>
                     <div className="flex-1 space-y-3">
-                        <div className="h-5 w-1/3 bg-border-default rounded"></div>
-                        <div className="h-4 w-1/4 bg-border-default rounded"></div>
+                        <div className="h-5 w-1/3 bg-muted rounded-none"></div>
+                        <div className="h-4 w-1/4 bg-muted rounded-none"></div>
                     </div>
                 </div>
             </Card>
@@ -64,48 +64,48 @@ const OrderCard: FC<OrderCardProps> = ({ order }) => {
     }
 
     return (
-        <Card elevation="subtle" padding="md">
+        <Card className="p-8 border border-border-default rounded-none bg-surface transition-colors hover:border-text-primary">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border-default bg-surface">
+                <div className="flex items-center gap-6">
+                    <div className="h-20 w-20 shrink-0 overflow-hidden bg-muted border-l border-b border-border-default">
                         {showPlaceholder ? (
-                            <div className="flex h-full w-full items-center justify-center bg-secondary text-2xl">
-                                🍽️
+                            <div className="flex h-full w-full items-center justify-center bg-primary text-surface opacity-50 font-serif italic text-xs tracking-widest">
+                                BiteUp
                             </div>
                         ) : (
                             <img 
                                 src={restaurant.image_url} 
                                 alt={restaurant.name}
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-cover grayscale transition-all duration-500 hover:grayscale-0"
                             />
                         )}
                     </div>
                     <div>
-                        <p className="text-caption text-text-muted mb-1">Order #{order.id}</p>
-                        <h2 className="text-xl font-bold text-text-primary">
+                        <p className="text-xs tracking-widest uppercase text-text-muted mb-1">Order #{order.id}</p>
+                        <h2 className="text-2xl font-bold text-text-primary">
                             {order.restaurant ? (
-                                <Link to={`/restaurants/${order.restaurant}`} className="hover:text-accent transition-colors">
+                                <Link to={`/restaurants/${order.restaurant}`} className="hover:opacity-80 transition-opacity">
                                     {restaurant?.name ?? 'Restaurant unavailable'}
                                 </Link>
                             ) : (
                                 'Restaurant unavailable'
                             )}
                         </h2>
-                        <p className="mt-1 text-sm text-text-secondary">{formatOrderDate(order.created_at)}</p>
+                        <p className="mt-1 text-lg font-serif italic text-text-secondary">{formatOrderDate(order.created_at)}</p>
                     </div>
                 </div>
-                <div className="flex shrink-0">
+                <div className="flex shrink-0 mt-2 sm:mt-0">
                     <OrderStatusBadge status={order.status} />
                 </div>
             </div>
 
-            <div className="my-5 border-y border-border-default py-4">
+            <div className="my-6 border-y border-border-default py-6">
                 <OrderSummaryList items={summaryItems} maxDisplay={2} />
             </div>
 
-            <div className="flex items-center justify-between gap-4">
-                <span className="font-semibold text-text-secondary">Total</span>
-                <span className="text-xl font-bold text-text-primary">{formatPrice(order.total_price)}</span>
+            <div className="flex items-center justify-between">
+                <span className="text-sm tracking-widest uppercase text-text-secondary font-medium">Total Amount</span>
+                <span className="text-2xl font-serif italic text-text-primary">{formatPrice(order.total_price)}</span>
             </div>
         </Card>
     );
