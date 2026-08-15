@@ -15,6 +15,7 @@ const LoginForm: FC = () => {
 
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [requestError, setRequestError] = useState('');
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validate = (): boolean => {
@@ -37,6 +38,7 @@ const LoginForm: FC = () => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setRequestError('');
+    setUnverifiedEmail('');
     if (errors[name as keyof typeof errors]) {
       setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
@@ -55,20 +57,31 @@ const LoginForm: FC = () => {
       await login(formData);
       navigate('/', { replace: true });
     } catch (error) {
-      setRequestError(getAuthError(error, 'Unable to sign in. Please try again.'));
+      const errorMsg = getAuthError(error, 'Unable to sign in. Please try again.');
+      // Detect unverified email errors from backend
+      if (
+        errorMsg.toLowerCase().includes('not been verified') || 
+        errorMsg.toLowerCase().includes('email verification required') ||
+        errorMsg.toLowerCase().includes('unverified')
+      ) {
+        setRequestError("Your account hasn't been verified yet.");
+        setUnverifiedEmail(formData.email);
+      } else {
+        setRequestError(errorMsg);
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Card elevation="elevated" padding="lg" className="w-full max-w-md space-y-6">
-      <div className="text-center">
-        <h2 className="text-page-title">Welcome back</h2>
-        <p className="mt-2 text-body">Please enter your details to sign in.</p>
+    <Card className="w-full max-w-md mx-auto p-10 border border-border-default shadow-elevated rounded-none">
+      <div className="text-center mb-10">
+        <h2 className="text-4xl font-serif italic text-text-primary">Welcome back</h2>
+        <p className="mt-4 text-sm text-text-secondary tracking-widest uppercase">Please enter your details</p>
       </div>
 
-      <form className="mt-8 space-y-6" onSubmit={handleLogin} noValidate>
+      <form className="space-y-6" onSubmit={handleLogin} noValidate>
         <div className="space-y-4">
           <FormField label="Email address" id="email" error={errors.email} required>
             <Input
@@ -102,12 +115,28 @@ const LoginForm: FC = () => {
         {requestError && (
           <Alert variant="error" message={requestError} className="my-4" />
         )}
+        
+        {unverifiedEmail && (
+          <div className="pb-2">
+            <Button
+              type="button"
+              variant="outline"
+              fullWidth
+              onClick={() => {
+                sessionStorage.setItem('verification_email', unverifiedEmail);
+                navigate('/verify-email', { state: { email: unverifiedEmail } });
+              }}
+            >
+              Verify Email
+            </Button>
+          </div>
+        )}
 
-        <div>
+        <div className="pt-2">
           <Button
             type="submit"
             variant="primary"
-            size="md"
+            size="lg"
             fullWidth
             isLoading={isSubmitting}
           >
@@ -116,9 +145,9 @@ const LoginForm: FC = () => {
         </div>
       </form>
 
-      <div className="text-center text-sm text-text-secondary">
+      <div className="mt-8 text-center text-sm text-text-secondary">
         <span>Don't have an account? </span>
-        <Link to="/register" className="font-semibold text-primary transition-base hover:text-accent">
+        <Link to="/register" className="font-semibold text-text-primary underline underline-offset-4 hover:opacity-80">
           Sign up
         </Link>
       </div>

@@ -23,7 +23,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     ref,
   ) => {
     const baseInputClasses =
-      'appearance-none block py-2.5 px-3.5 text-sm rounded-sm transition-base bg-surface placeholder:text-text-muted text-text-primary focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:cursor-not-allowed disabled:bg-secondary disabled:opacity-70';
+      'appearance-none block py-2.5 px-3.5 text-sm rounded-none transition-base bg-surface placeholder:text-text-muted text-text-primary focus:outline-none focus:ring-1 focus:ring-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:bg-secondary disabled:opacity-70';
 
     const borderClass = error
       ? 'border border-status-error focus:ring-status-error focus:border-status-error text-status-error'

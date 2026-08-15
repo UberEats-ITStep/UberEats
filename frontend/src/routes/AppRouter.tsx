@@ -4,6 +4,7 @@ import MainLayout from '../layouts/MainLayout';
 import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
+import VerifyEmail from '../pages/VerifyEmail';
 import NotFound from '../pages/NotFound';
 import OrderHistory from '../pages/OrderHistory';
 import Profile from '../pages/Profile';
@@ -23,6 +24,7 @@ const AppRouter: React.FC = () => {
           <Route path="/restaurants/:restaurantId" element={<RestaurantDetails />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>

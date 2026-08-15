@@ -21,23 +21,23 @@ const OrderSummaryList: FC<OrderSummaryListProps> = ({ items, maxDisplay }) => {
 
   return (
     <div className="w-full">
-      <ul className="space-y-3">
+      <ul className="space-y-4">
         {displayItems.map((item) => (
           <li key={item.id} className="flex justify-between items-start gap-4">
             <div className="flex-1 pr-4">
-              <p className="text-sm font-medium text-text-primary line-clamp-2">
-                <span className="font-bold text-accent mr-2">{item.quantity}x</span>
+              <p className="text-xl font-serif italic text-text-primary line-clamp-2">
+                <span className="font-sans font-bold text-text-primary mr-3 not-italic text-base">{item.quantity}x</span>
                 {item.name}
               </p>
             </div>
-            <p className="text-sm font-medium text-text-primary whitespace-nowrap">
+            <p className="text-xl font-serif italic text-text-primary whitespace-nowrap">
               {formatPrice(item.price)}
             </p>
           </li>
         ))}
       </ul>
       {remainingCount > 0 && (
-        <p className="mt-3 text-sm text-text-muted italic">
+        <p className="mt-4 text-xs tracking-widest uppercase text-text-muted">
           + {remainingCount} more item{remainingCount !== 1 ? 's' : ''}...
         </p>
       )}

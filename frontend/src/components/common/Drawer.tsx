@@ -34,7 +34,7 @@ export const Drawer: FC<DrawerProps> = ({ isOpen, onClose, title, children, foot
       
       {/* Drawer Panel */}
       <div className="absolute inset-y-0 right-0 flex max-w-full">
-        <div className="w-screen max-w-md transform transition-transform duration-300 ease-in-out">
+        <div className="w-screen max-w-md animate-slide-in-right">
           <div className="flex h-full flex-col bg-surface shadow-elevated">
             
             {/* Header */}

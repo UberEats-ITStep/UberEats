@@ -21,14 +21,14 @@ export interface BadgeProps {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  brand: 'bg-accent text-text-primary font-bold',
+  brand: 'bg-primary text-text-inverse font-bold',
   primary: 'bg-primary text-text-inverse font-semibold',
   secondary: 'bg-secondary text-text-secondary font-medium border border-border-default',
   neutral: 'bg-surface-muted text-text-primary font-medium border border-border-default',
-  success: 'bg-status-success-muted text-emerald-800 font-semibold',
-  warning: 'bg-status-warning-muted text-amber-800 font-semibold',
-  error: 'bg-status-error-muted text-red-800 font-semibold',
-  info: 'bg-status-info-muted text-blue-800 font-semibold',
+  success: 'bg-surface text-text-primary font-semibold border border-status-success',
+  warning: 'bg-surface text-text-primary font-semibold border border-status-warning',
+  error: 'bg-surface text-text-primary font-semibold border border-status-error',
+  info: 'bg-surface text-text-primary font-semibold border border-border-default',
 };
 
 const sizeClasses: Record<BadgeSize, string> = {
@@ -46,7 +46,7 @@ export const Badge: FC<BadgeProps> = ({
 }) => {
   return (
     <span
-      className={`inline-flex items-center justify-center shrink-0 rounded-full leading-none transition-base ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      className={`inline-flex items-center justify-center shrink-0 rounded-none leading-none transition-base ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
     >
       {icon && <span className="shrink-0 inline-flex">{icon}</span>}
       <span>{children}</span>

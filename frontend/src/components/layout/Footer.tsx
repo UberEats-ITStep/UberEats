@@ -5,40 +5,40 @@ export const Footer: FC = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="mt-auto border-t border-primary-hover bg-primary text-text-inverse">
-      <div className="container-page py-12">
+    <footer className="mt-auto border-t border-border-default bg-background text-text-primary">
+      <div className="container-page py-16">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4 lg:gap-12">
           {/* Brand & Description */}
-          <div className="space-y-4 md:col-span-1">
+          <div className="space-y-6 md:col-span-1">
             <Link
               to="/"
-              className="inline-block text-2xl font-extrabold tracking-tight text-white transition-base hover:opacity-90"
+              className="inline-block text-3xl font-bold tracking-tight transition-base hover:opacity-80"
             >
-              <span>Bite<span className="text-accent">Up</span></span>
+              <span>Bite<span className="font-serif italic font-normal tracking-normal">Up.</span></span>
             </Link>
-            <p className="text-sm leading-relaxed text-slate-300">
-              Discover and order from the best local restaurants around you. Fresh food delivered fast to your doorstep.
+            <p className="text-sm leading-relaxed text-text-secondary">
+              Curated local tastes, delivered with precision. Elevating the standard for modern food discovery.
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h4 className="mb-4 text-xs font-semibold tracking-wider text-slate-400 uppercase">
+            <h4 className="mb-6 text-xs font-semibold tracking-wider text-text-primary uppercase">
               Explore
             </h4>
-            <ul className="space-y-2 text-sm text-slate-300">
+            <ul className="space-y-3 text-sm text-text-secondary">
               <li>
-                <Link to="/" className="transition-base hover:text-white hover:underline">
+                <Link to="/" className="transition-base hover:text-text-primary hover:underline underline-offset-4">
                   Restaurants
                 </Link>
               </li>
               <li>
-                <Link to="/orders" className="transition-base hover:text-white hover:underline">
+                <Link to="/orders" className="transition-base hover:text-text-primary hover:underline underline-offset-4">
                   My Orders
                 </Link>
               </li>
               <li>
-                <Link to="/profile" className="transition-base hover:text-white hover:underline">
+                <Link to="/profile" className="transition-base hover:text-text-primary hover:underline underline-offset-4">
                   Account Profile
                 </Link>
               </li>
@@ -47,22 +47,22 @@ export const Footer: FC = () => {
 
           {/* Partners & Delivery */}
           <div>
-            <h4 className="mb-4 text-xs font-semibold tracking-wider text-slate-400 uppercase">
+            <h4 className="mb-6 text-xs font-semibold tracking-wider text-text-primary uppercase">
               Partners
             </h4>
-            <ul className="space-y-2 text-sm text-slate-300">
+            <ul className="space-y-3 text-sm text-text-secondary">
               <li>
-                <span className="cursor-pointer transition-base hover:text-white hover:underline">
+                <span className="cursor-pointer transition-base hover:text-text-primary hover:underline underline-offset-4">
                   Add Your Restaurant
                 </span>
               </li>
               <li>
-                <span className="cursor-pointer transition-base hover:text-white hover:underline">
+                <span className="cursor-pointer transition-base hover:text-text-primary hover:underline underline-offset-4">
                   Deliver with BiteUp
                 </span>
               </li>
               <li>
-                <span className="cursor-pointer transition-base hover:text-white hover:underline">
+                <span className="cursor-pointer transition-base hover:text-text-primary hover:underline underline-offset-4">
                   Business Accounts
                 </span>
               </li>
@@ -71,22 +71,22 @@ export const Footer: FC = () => {
 
           {/* Help & Support */}
           <div>
-            <h4 className="mb-4 text-xs font-semibold tracking-wider text-slate-400 uppercase">
+            <h4 className="mb-6 text-xs font-semibold tracking-wider text-text-primary uppercase">
               Support
             </h4>
-            <ul className="space-y-2 text-sm text-slate-300">
+            <ul className="space-y-3 text-sm text-text-secondary">
               <li>
-                <span className="cursor-pointer transition-base hover:text-white hover:underline">
+                <span className="cursor-pointer transition-base hover:text-text-primary hover:underline underline-offset-4">
                   Help Center
                 </span>
               </li>
               <li>
-                <span className="cursor-pointer transition-base hover:text-white hover:underline">
+                <span className="cursor-pointer transition-base hover:text-text-primary hover:underline underline-offset-4">
                   Terms of Service
                 </span>
               </li>
               <li>
-                <span className="cursor-pointer transition-base hover:text-white hover:underline">
+                <span className="cursor-pointer transition-base hover:text-text-primary hover:underline underline-offset-4">
                   Privacy Policy
                 </span>
               </li>
@@ -94,9 +94,9 @@ export const Footer: FC = () => {
           </div>
         </div>
 
-        <div className="mt-12 border-t border-primary-hover pt-8 text-center text-xs text-slate-400 sm:flex sm:items-center sm:justify-between sm:text-left">
+        <div className="mt-16 border-t border-border-default pt-8 text-center text-xs text-text-muted sm:flex sm:items-center sm:justify-between sm:text-left">
           <p>&copy; {currentYear} BiteUp Technologies Inc. All rights reserved.</p>
-          <p className="mt-2 sm:mt-0">Designed with a modern semantic token system.</p>
+          <p className="mt-2 sm:mt-0 font-serif italic text-sm">Crafted with intentionality.</p>
         </div>
       </div>
     </footer>

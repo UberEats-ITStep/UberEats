@@ -17,9 +17,9 @@ const elevationClasses = {
 };
 
 const radiusClasses = {
-  md: 'rounded-md',
-  lg: 'rounded-lg',
-  xl: 'rounded-xl',
+  md: 'rounded-none',
+  lg: 'rounded-none',
+  xl: 'rounded-none',
 };
 
 const paddingClasses = {

@@ -13,7 +13,7 @@ import ReviewList from '../features/reviews/components/ReviewList';
 const RestaurantDetails: FC = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
   const { restaurant, isLoading, error, reload } = useRestaurantDetails(restaurantId);
-  const { addToCart } = useCart();
+  const { addToCart, isLoading: isCartLoading } = useCart();
 
   const handleAddToCart = (item: MenuItem) => {
     if (restaurant) {
@@ -50,34 +50,38 @@ const RestaurantDetails: FC = () => {
   }
 
   return (
-    <SectionContainer width="page" padding="md" className="pb-16">
-      <Link
-        to="/"
-        className="mb-5 inline-flex items-center font-button text-text-secondary transition-base hover:text-primary"
-      >
-        ← All restaurants
-      </Link>
+    <div className="bg-background min-h-screen">
+      <SectionContainer width="page" padding="md" className="pb-16 pt-6">
+        <Link
+          to="/"
+          className="mb-8 inline-flex items-center text-sm font-medium tracking-widest uppercase text-text-muted transition-base hover:text-text-primary underline underline-offset-4"
+        >
+          ← Directory
+        </Link>
 
-      <RestaurantHero restaurant={restaurant} />
-      <RestaurantStats restaurant={restaurant} />
+        <RestaurantHero restaurant={restaurant} />
+        <RestaurantStats restaurant={restaurant} />
 
-      <main className="mt-12">
-        <div className="flex flex-col gap-5 border-b border-border-default pb-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-caption text-accent">Explore</p>
-            <h2 className="mt-1 text-page-title">Our menu</h2>
+        <main className="mt-16">
+          <div className="flex flex-col gap-6 border-b border-text-primary pb-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs tracking-widest uppercase text-text-muted mb-2">Explore</p>
+              <h2 className="text-5xl font-serif italic text-text-primary">The Menu</h2>
+            </div>
+            <div className="lg:w-1/2">
+              <CategoryNavbar categories={restaurant.categories} />
+            </div>
           </div>
-          <CategoryNavbar categories={restaurant.categories} />
-        </div>
 
-        <MenuSection categories={restaurant.categories} onAddToCart={handleAddToCart} />
-        
-        {/* Customer Reviews Section */}
-        <div className="mt-16 border-t border-border-default">
-          <ReviewList restaurant={restaurant} onReviewChange={() => reload(true)} />
-        </div>
-      </main>
-    </SectionContainer>
+          <MenuSection categories={restaurant.categories} onAddToCart={handleAddToCart} isLoading={isCartLoading} />
+          
+          {/* Customer Reviews Section */}
+          <div className="mt-24 border-t border-text-primary pt-8">
+            <ReviewList restaurant={restaurant} onReviewChange={() => reload(true)} />
+          </div>
+        </main>
+      </SectionContainer>
+    </div>
   );
 };
 

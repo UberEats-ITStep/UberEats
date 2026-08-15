@@ -7,44 +7,8 @@ import type { RestaurantFilterValues } from '../features/restaurants/components/
 import { restaurantService } from '../features/restaurants/api/restaurant.service';
 import type { Cuisine, Restaurant } from '../features/restaurants/types/restaurant.types';
 import { SectionContainer, LoadingState, EmptyState, Alert } from '../components/common';
-import PromotionCarousel from '../features/home/components/PromotionCarousel';
-import type { Promotion } from '../features/home/types/promotion.types';
-
-const MOCK_PROMOTIONS: Promotion[] = [
-  {
-    id: 1,
-    title: 'Free Delivery Weekend',
-    description: 'Enjoy free delivery on all orders over $20 this weekend only!',
-    ctaText: 'Order Now',
-    ctaLink: '/restaurants',
-    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
-    textColor: 'text-white',
-    accentColor: 'text-accent',
-    illustrationEmoji: '🛵',
-  },
-  {
-    id: 2,
-    title: '20% Off Sushi',
-    description: 'Craving sushi? Get a sweet 20% discount on top-rated sushi places.',
-    ctaText: 'Find Sushi',
-    ctaLink: '/?q=sushi',
-    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
-    textColor: 'text-white',
-    accentColor: 'text-rose-500',
-    illustrationEmoji: '🍣',
-  },
-  {
-    id: 3,
-    title: 'Summer Deals',
-    description: 'Cool down with buy-1-get-1-free ice cream and cold beverages.',
-    ctaText: 'Cool Down',
-    ctaLink: '/?q=ice',
-    backgroundColor: 'bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900',
-    textColor: 'text-white',
-    accentColor: 'text-sky-400',
-    illustrationEmoji: '🍦',
-  },
-];
+import EditorialHero from '../features/home/components/EditorialHero';
+import { useAuth } from '../hooks/useAuth';
 
 const EMPTY_FILTERS: RestaurantFilterValues = {
   cuisine: '',
@@ -53,6 +17,7 @@ const EMPTY_FILTERS: RestaurantFilterValues = {
 };
 
 const Home: FC = () => {
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState<RestaurantFilterValues>(EMPTY_FILTERS);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -113,14 +78,19 @@ const Home: FC = () => {
     setFilters(EMPTY_FILTERS);
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <LoadingState message="" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <SectionContainer width="page" padding="md" className="mt-6 w-full flex-1">
-        {!hasFilters && (
-          <div className="mb-10 w-full">
-            <PromotionCarousel promotions={MOCK_PROMOTIONS} autoScrollInterval={6000} />
-          </div>
-        )}
+      {!isAuthenticated && <EditorialHero />}
+      
+      <SectionContainer width="page" padding="md" className="w-full flex-1" id="restaurants">
 
         <div className="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-6 border-b border-border-default pb-4">
           <div className="flex items-center gap-4">

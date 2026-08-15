@@ -22,4 +22,13 @@ export const authApi = {
     const response = await apiClient.get<Profile>('/profile/');
     return response.data;
   },
+
+  verifyEmail: async (email: string, code: string): Promise<AuthTokens> => {
+    const response = await apiClient.post<AuthTokens>('/auth/verify-email/', { email, code });
+    return response.data;
+  },
+
+  resendVerification: async (email: string): Promise<void> => {
+    await apiClient.post('/auth/resend-verification/', { email });
+  },
 };
