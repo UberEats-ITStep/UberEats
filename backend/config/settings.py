@@ -152,6 +152,13 @@ CORS_ALLOW_CREDENTIALS = True
 
 AUTH_USER_MODEL = 'users.User'
 
+PASSWORD_RESET_CODE_TTL_SECONDS = int(
+    os.getenv('PASSWORD_RESET_CODE_TTL_SECONDS', '600')
+)
+PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = int(
+    os.getenv('PASSWORD_RESET_RESEND_COOLDOWN_SECONDS', '60')
+)
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
