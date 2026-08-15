@@ -76,6 +76,10 @@ class VerificationCodeService:
         ).delete()
 
     @staticmethod
+    def delete_codes(user: User, purpose: str) -> None:
+        VerificationCode.objects.filter(user=user, purpose=purpose).delete()
+
+    @staticmethod
     def generate_code() -> str:
         return str(secrets.randbelow(900000) + 100000)
 
