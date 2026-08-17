@@ -152,10 +152,39 @@ CORS_ALLOW_CREDENTIALS = True
 
 AUTH_USER_MODEL = 'users.User'
 
+PASSWORD_RESET_CODE_TTL_SECONDS = int(
+    os.getenv('PASSWORD_RESET_CODE_TTL_SECONDS', '600')
+)
+PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = int(
+    os.getenv('PASSWORD_RESET_RESEND_COOLDOWN_SECONDS', '60')
+)
+
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend',
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@example.com')
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'password_reset_request': os.getenv(
+            'PASSWORD_RESET_REQUEST_THROTTLE_RATE',
+            '5/hour',
+        ),
+        'password_reset_confirm': os.getenv(
+            'PASSWORD_RESET_CONFIRM_THROTTLE_RATE',
+            '10/hour',
+        ),
+    },
 }
 
 from datetime import timedelta

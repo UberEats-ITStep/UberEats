@@ -1,13 +1,20 @@
+import re
+from datetime import timedelta
 from typing import Any, cast
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core import mail
+from django.core.cache import cache
+from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
+from rest_framework.throttling import ScopedRateThrottle
 
-from .models import Profile
+from .models import Profile, VerificationCode
 
 
 # Start PostgreSQL before running these tests; the backend test suite expects the real database.
@@ -409,3 +416,255 @@ class JwtAuthApiTests(APITestCase):
         self.user.profile.refresh_from_db()
         self.assertEqual(other_user.profile.address, 'Lviv')
         self.assertEqual(self.user.profile.address, 'Kyiv')
+
+
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    PASSWORD_RESET_CODE_TTL_SECONDS=600,
+    PASSWORD_RESET_RESEND_COOLDOWN_SECONDS=60,
+    REST_FRAMEWORK={
+        'DEFAULT_THROTTLE_RATES': {
+            'password_reset_request': '100/hour',
+            'password_reset_confirm': '100/hour',
+        },
+    },
+)
+class PasswordResetApiTests(APITestCase):
+    def setUp(self) -> None:
+        cache.clear()
+        mail.outbox = []
+        self.user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='reset.user',
+                email='reset@example.com',
+                password='CurrentPass123!',
+            ),
+        )
+        self.forgot_password_url = reverse('forgot-password')
+        self.reset_password_url = reverse('reset-password')
+        self.login_url = reverse('login')
+
+    def get_verification_code(self, message: Any) -> str:
+        match = re.search(r'\b(\d{6})\b', message.body)
+        self.assertIsNotNone(match)
+        return cast(Any, match).group(1)
+
+    def request_reset_code(self) -> str:
+        response = cast(
+            Response,
+            self.client.post(
+                self.forgot_password_url,
+                {'email': self.user.email},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        return self.get_verification_code(mail.outbox[0])
+
+    def reset_password(self, code: str, password: str = 'UpdatedPass123!') -> Response:
+        return cast(
+            Response,
+            self.client.post(
+                self.reset_password_url,
+                {
+                    'email': self.user.email,
+                    'verification_code': code,
+                    'new_password': password,
+                    'confirm_password': password,
+                },
+                format='json',
+            ),
+        )
+
+    def test_forgot_password_returns_same_response_for_existing_and_missing_email(self) -> None:
+        existing_response = cast(
+            Response,
+            self.client.post(
+                self.forgot_password_url,
+                {'email': self.user.email},
+                format='json',
+            ),
+        )
+        missing_response = cast(
+            Response,
+            self.client.post(
+                self.forgot_password_url,
+                {'email': 'missing@example.com'},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(existing_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(missing_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(existing_response.data, missing_response.data)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_reset_password_updates_password_and_removes_code(self) -> None:
+        code = self.request_reset_code()
+        verification_code = VerificationCode.objects.get(
+            user=self.user,
+            purpose=VerificationCode.Purpose.PASSWORD_RESET,
+        )
+
+        self.assertNotEqual(verification_code.code_hash, code)
+
+        response = self.reset_password(code)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(
+            VerificationCode.objects.filter(
+                user=self.user,
+                purpose=VerificationCode.Purpose.PASSWORD_RESET,
+            ).exists()
+        )
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('UpdatedPass123!'))
+        self.assertFalse(self.user.check_password('CurrentPass123!'))
+
+        old_password_response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {'email': self.user.email, 'password': 'CurrentPass123!'},
+                format='json',
+            ),
+        )
+        new_password_response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {'email': self.user.email, 'password': 'UpdatedPass123!'},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(old_password_response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(new_password_response.status_code, status.HTTP_200_OK)
+
+    def test_reset_password_rejects_invalid_code(self) -> None:
+        self.request_reset_code()
+
+        response = self.reset_password('000000')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('CurrentPass123!'))
+
+    def test_reset_password_removes_expired_code(self) -> None:
+        code = self.request_reset_code()
+        verification_code = VerificationCode.objects.get(user=self.user)
+        verification_code.expires_at = timezone.now() - timedelta(seconds=1)
+        verification_code.save(update_fields=['expires_at'])
+
+        response = self.reset_password(code)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(VerificationCode.objects.filter(user=self.user).exists())
+
+    def test_forgot_password_enforces_resend_cooldown(self) -> None:
+        self.request_reset_code()
+        verification_code = VerificationCode.objects.get(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.post(
+                self.forgot_password_url,
+                {'email': self.user.email},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(VerificationCode.objects.get(user=self.user).pk, verification_code.pk)
+
+    def test_forgot_password_invalidates_previous_code_after_cooldown(self) -> None:
+        first_code = self.request_reset_code()
+        verification_code = VerificationCode.objects.get(user=self.user)
+        verification_code.created_at = timezone.now() - timedelta(seconds=61)
+        verification_code.save(update_fields=['created_at'])
+
+        response = cast(
+            Response,
+            self.client.post(
+                self.forgot_password_url,
+                {'email': self.user.email},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 2)
+
+        invalid_response = self.reset_password(first_code)
+
+        self.assertEqual(invalid_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @override_settings(
+        REST_FRAMEWORK={
+            'DEFAULT_THROTTLE_RATES': {
+                'password_reset_request': '2/hour',
+                'password_reset_confirm': '2/hour',
+            },
+        },
+    )
+    @patch.object(
+        ScopedRateThrottle,
+        'THROTTLE_RATES',
+        {
+            'password_reset_request': '2/hour',
+            'password_reset_confirm': '2/hour',
+        },
+    )
+    def test_forgot_password_throttling(self) -> None:
+        for _ in range(2):
+            response = cast(
+                Response,
+                self.client.post(
+                    self.forgot_password_url,
+                    {'email': self.user.email},
+                    format='json',
+                ),
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        throttled_response = cast(
+            Response,
+            self.client.post(
+                self.forgot_password_url,
+                {'email': self.user.email},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(throttled_response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    @override_settings(
+        REST_FRAMEWORK={
+            'DEFAULT_THROTTLE_RATES': {
+                'password_reset_request': '2/hour',
+                'password_reset_confirm': '2/hour',
+            },
+        },
+    )
+    @patch.object(
+        ScopedRateThrottle,
+        'THROTTLE_RATES',
+        {
+            'password_reset_request': '2/hour',
+            'password_reset_confirm': '2/hour',
+        },
+    )
+    def test_reset_password_throttling(self) -> None:
+        self.request_reset_code()
+
+        for _ in range(2):
+            response = self.reset_password('000000')
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        throttled_response = self.reset_password('000000')
+
+        self.assertEqual(throttled_response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)

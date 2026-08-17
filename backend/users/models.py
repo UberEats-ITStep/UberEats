@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+
 class User(AbstractUser):
     ROLE_CHOICES = (
         ('CLIENT', 'CLIENT'),
@@ -16,6 +17,27 @@ class User(AbstractUser):
     # Require email for authentication
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
+
+
+class VerificationCode(models.Model):
+    class Purpose(models.TextChoices):
+        PASSWORD_RESET = 'PASSWORD_RESET', 'Password reset'
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='verification_codes',
+    )
+    code_hash = models.CharField(max_length=128)
+    purpose = models.CharField(max_length=32, choices=Purpose.choices)
+    expires_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'purpose', 'created_at']),
+        ]
+
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
