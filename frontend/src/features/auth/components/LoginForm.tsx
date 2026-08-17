@@ -3,6 +3,7 @@ import type { FC, FormEvent, ChangeEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { getAuthError } from '../utils/getAuthError';
+import { triggerMonochromeConfetti } from '../../../utils/confetti';
 import { Card, FormField, Input, Button, Alert } from '../../../components/common';
 
 const LoginForm: FC = () => {
@@ -55,6 +56,7 @@ const LoginForm: FC = () => {
 
     try {
       await login(formData);
+      triggerMonochromeConfetti();
       navigate('/', { replace: true });
     } catch (error) {
       const errorMsg = getAuthError(error, 'Unable to sign in. Please try again.');
@@ -124,7 +126,7 @@ const LoginForm: FC = () => {
               fullWidth
               onClick={() => {
                 sessionStorage.setItem('verification_email', unverifiedEmail);
-                navigate('/verify-email', { state: { email: unverifiedEmail } });
+                navigate('/verify-email', { state: { email: unverifiedEmail, autoResend: true } });
               }}
             >
               Verify Email
