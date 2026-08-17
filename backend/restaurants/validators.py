@@ -13,6 +13,7 @@ from django.core.exceptions import ValidationError
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_PIL_FORMATS = {"JPEG", "PNG", "WEBP"}
 MAX_IMAGE_SIZE_MB = 5
 
 
@@ -50,6 +51,10 @@ def validate_image_integrity(file) -> None:
     try:
         file.seek(0)
         with Image.open(file) as img:
+            if img.format not in ALLOWED_PIL_FORMATS:
+                raise ValidationError(
+                    "Unsupported image content. Allowed formats: JPEG, PNG, WEBP."
+                )
             img.verify()
     except (UnidentifiedImageError, OSError, ValueError) as exc:
         raise ValidationError("Uploaded file is not a valid image.") from exc

@@ -146,6 +146,56 @@ class SerializerImageResolutionTests(APITestCase):
         self.assertNotEqual(image_value, "")
         self.assertIsNotNone(image_value)
 
+    def test_menu_item_api_accepts_and_removes_an_upload(self):
+        restaurant = Restaurant.objects.create(name="Upload Spot", cuisine=self.cuisine)
+        category = Category.objects.create(name="Uploads")
+        create_response = self.client.post(
+            reverse("menuitem-list"),
+            {
+                "restaurant": restaurant.pk,
+                "category": category.pk,
+                "name": "Uploaded Dish",
+                "price": "7.50",
+                "is_available": True,
+                "image": SimpleUploadedFile(
+                    "dish.png", _valid_png_bytes(), content_type="image/png"
+                ),
+            },
+            format="multipart",
+        )
+        self.assertEqual(
+            create_response.status_code, status.HTTP_201_CREATED, create_response.data
+        )
+        self.assertEqual(create_response.data["image"], create_response.data["image_url"])
+
+        remove_response = self.client.patch(
+            reverse("menuitem-detail", args=[create_response.data["id"]]),
+            {"image": None},
+            format="json",
+        )
+        self.assertEqual(remove_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(remove_response.data["image"].endswith("/placeholders/menu_item.png"))
+
+    def test_menu_item_api_rejects_invalid_upload(self):
+        restaurant = Restaurant.objects.create(name="Invalid Upload Spot", cuisine=self.cuisine)
+        category = Category.objects.create(name="Invalid Uploads")
+        response = self.client.post(
+            reverse("menuitem-list"),
+            {
+                "restaurant": restaurant.pk,
+                "category": category.pk,
+                "name": "Invalid Dish",
+                "price": "7.50",
+                "is_available": True,
+                "image": SimpleUploadedFile(
+                    "dish.png", b"not an image", content_type="image/png"
+                ),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(MenuItem.objects.filter(name="Invalid Dish").exists())
+
 
 class SeedMediaCommandTests(TestCase):
     def test_seed_is_idempotent(self):

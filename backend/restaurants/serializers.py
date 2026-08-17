@@ -36,7 +36,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
-    image = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MenuItem
@@ -48,6 +48,7 @@ class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
             "description",
             "price",
             "image",
+            "image_url",
             "is_available",
             "unavailable_reason",
             "is_vegetarian",
@@ -55,9 +56,18 @@ class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
             "calories",
             "slug",
         )
+        read_only_fields = ("slug",)
 
-    def get_image(self, obj):
+    def get_image_url(self, obj):
         return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Keep the established `image` response while also exposing the legacy
+        # `image_url` alias. Unlike SerializerMethodField, ImageField stays
+        # writable for multipart uploads and explicit removal with null.
+        data["image"] = data["image_url"]
+        return data
 
     def validate_price(self, value):
         if value <= 0:
@@ -85,7 +95,7 @@ class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
 
 class RestaurantMenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
-    image = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MenuItem
@@ -97,6 +107,7 @@ class RestaurantMenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
             "description",
             "price",
             "image",
+            "image_url",
             "is_available",
             "unavailable_reason",
             "is_vegetarian",
@@ -105,8 +116,13 @@ class RestaurantMenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
             "slug",
         )
 
-    def get_image(self, obj):
+    def get_image_url(self, obj):
         return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["image"] = data["image_url"]
+        return data
 
 
 class RestaurantListSerializer(ImageURLMixin, serializers.ModelSerializer):
