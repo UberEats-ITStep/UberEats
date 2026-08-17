@@ -3,11 +3,16 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils.text import slugify
 
 from restaurants.models import Category, Cuisine, MenuItem, OpeningHours, Restaurant
 
 
 User = get_user_model()
+
+
+def _image_url(seed, width, height):
+    return f"https://picsum.photos/seed/{slugify(seed)}/{width}/{height}"
 
 
 class Command(BaseCommand):
@@ -81,7 +86,7 @@ class Command(BaseCommand):
                 "name": "Pizza Paradise",
                 "cuisine": "Italian",
                 "description": "Hand-stretched pizzas, sides, and desserts.",
-                "image_url": "https://example.com/images/pizza-paradise.jpg",
+                "image_url": _image_url("pizza-paradise", 800, 500),
                 "address": "101 Main Street, New York, NY",
                 "latitude": Decimal("40.712776"),
                 "longitude": Decimal("-74.005974"),
@@ -114,7 +119,7 @@ class Command(BaseCommand):
                 "name": "Burger Joint",
                 "cuisine": "American",
                 "description": "Classic burgers, fries, and milkshakes.",
-                "image_url": "https://example.com/images/burger-joint.jpg",
+                "image_url": _image_url("burger-joint", 800, 500),
                 "address": "202 Market Street, Chicago, IL",
                 "latitude": Decimal("41.878113"),
                 "longitude": Decimal("-87.629799"),
@@ -146,7 +151,7 @@ class Command(BaseCommand):
                 "name": "Sushi World",
                 "cuisine": "Japanese",
                 "description": "Fresh sushi rolls, nigiri, and Japanese snacks.",
-                "image_url": "https://example.com/images/sushi-world.jpg",
+                "image_url": _image_url("sushi-world", 800, 500),
                 "address": "303 Harbor Road, San Francisco, CA",
                 "latitude": Decimal("37.774929"),
                 "longitude": Decimal("-122.419418"),
@@ -252,6 +257,9 @@ class Command(BaseCommand):
                             "category": category,
                             "description": item_description,
                             "price": item_price,
+                            "image_url": _image_url(
+                                f"{restaurant.name}-{item_name}", 400, 300
+                            ),
                             "is_available": is_available,
                             "unavailable_reason": "" if is_available else "Temporarily sold out",
                             "is_vegetarian": item_name in {

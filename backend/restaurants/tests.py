@@ -192,7 +192,11 @@ class MenuItemTests(TestCase):
             image=SimpleUploadedFile("tuna.jpg", b"image", content_type="image/jpeg"),
         )
 
-        self.assertIsNone(MenuItemSerializer(empty, context={"request": request}).data["image_url"])
+        self.assertTrue(
+            MenuItemSerializer(empty, context={"request": request})
+            .data["image_url"]
+            .endswith("/static/images/placeholders/menu_item.png")
+        )
         self.assertTrue(
             MenuItemSerializer(image, context={"request": request})
             .data["image_url"]
@@ -259,7 +263,8 @@ class RestaurantApiTests(APITestCase):
         self.assertEqual([item["id"] for item in items], [available.pk, unavailable.pk])
         self.assertEqual(items[0]["slug"], "salmon-roll")
         self.assertEqual(items[0]["calories"], 320)
-        self.assertIsNone(items[0]["image_url"])
+        self.assertEqual(items[0]["image"], items[0]["image_url"])
+        self.assertTrue(items[0]["image_url"].endswith("/static/images/placeholders/menu_item.png"))
         self.assertFalse(items[1]["is_available"])
         self.assertEqual(items[1]["unavailable_reason"], "Sold out")
 
@@ -351,6 +356,8 @@ class SeedAndMigrationTests(TestCase):
         self.assertTrue(MenuItem.objects.filter(is_available=True).exists())
         self.assertTrue(MenuItem.objects.filter(is_available=False).exists())
         self.assertTrue(MenuItem.objects.filter(calories__isnull=False).exists())
+        self.assertFalse(Restaurant.objects.filter(image_url__contains="example.com").exists())
+        self.assertFalse(MenuItem.objects.filter(image_url="").exists())
 
     def test_test_database_has_all_migration_leaf_nodes_applied(self):
         executor = MigrationExecutor(connection)
