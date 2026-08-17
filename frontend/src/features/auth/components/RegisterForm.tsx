@@ -73,7 +73,8 @@ const RegisterForm: FC = () => {
         phone_number: formData.phoneNumber.trim() || undefined,
         address: formData.address.trim() || undefined,
       });
-      navigate("/", { replace: true });
+      sessionStorage.setItem('verification_email', formData.email);
+      navigate("/verify-email", { state: { email: formData.email, startCooldown: true }, replace: true });
     } catch (error) {
       setRequestError(getAuthError(error, "Unable to create your account. Please try again."));
     } finally {
@@ -82,15 +83,15 @@ const RegisterForm: FC = () => {
   };
 
   return (
-    <Card elevation="elevated" padding="lg" className="w-full max-w-md space-y-6">
-      <div className="text-center">
-        <h2 className="text-page-title">
-          Create an account
+    <Card className="w-full max-w-md mx-auto p-10 border border-border-default shadow-elevated rounded-none">
+      <div className="text-center mb-10">
+        <h2 className="text-4xl font-serif italic text-text-primary">
+          Join BiteUp
         </h2>
-        <p className="mt-2 text-body">Join BiteUp today.</p>
+        <p className="mt-4 text-sm text-text-secondary tracking-widest uppercase">Create an account</p>
       </div>
 
-      <form className="mt-8 space-y-5" onSubmit={handleRegister} noValidate>
+      <form className="space-y-6" onSubmit={handleRegister} noValidate>
         <div className="space-y-4">
           <FormField label="Email address" id="email" error={errors.email} required>
             <Input
@@ -163,11 +164,11 @@ const RegisterForm: FC = () => {
           <Alert variant="error" message={requestError} className="my-4" />
         )}
 
-        <div>
+        <div className="pt-2">
           <Button
             type="submit"
             variant="primary"
-            size="md"
+            size="lg"
             fullWidth
             isLoading={isSubmitting}
           >
@@ -176,11 +177,11 @@ const RegisterForm: FC = () => {
         </div>
       </form>
 
-      <div className="text-center text-sm text-text-secondary">
+      <div className="mt-8 text-center text-sm text-text-secondary">
         <span>Already have an account? </span>
         <Link
           to="/login"
-          className="font-semibold text-primary transition-base hover:text-accent"
+          className="font-semibold text-text-primary underline underline-offset-4 hover:opacity-80"
         >
           Log in
         </Link>

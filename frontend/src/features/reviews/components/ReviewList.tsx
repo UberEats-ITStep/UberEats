@@ -4,7 +4,6 @@ import type { Review } from '../types/review.types';
 import { useAuth } from '../../../hooks/useAuth';
 import { useReviews } from '../hooks/useReviews';
 import { useEligibleReviewOrder } from '../hooks/useEligibleReviewOrder';
-import RatingStars from './RatingStars';
 import ReviewCard from './ReviewCard';
 import ReviewModal from './ReviewModal';
 import { Button, EmptyState, Alert, Modal } from '../../../components/common';
@@ -79,60 +78,59 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
   const hasReviews = reviews.length > 0;
 
   return (
-    <div className="py-8">
+    <div className="py-16">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-6 mb-10 border-b border-text-primary pb-4">
         <div>
-          <h2 className="text-section-title mb-2">Customer Reviews</h2>
+          <h2 className="text-3xl font-serif italic text-text-primary mb-2">Curated Feedback</h2>
           {restaurant.review_count > 0 ? (
             <div className="flex items-center gap-3">
-              <RatingStars rating={Math.round(Number(restaurant.rating) || 0)} />
-              <span className="font-bold text-lg text-text-primary">
-                {Number(restaurant.rating).toFixed(1)}
+              <span className="font-serif italic text-lg text-text-primary">
+                ★ {Number(restaurant.rating).toFixed(1)}
               </span>
-              <span className="text-text-secondary text-sm">
+              <span className="text-text-muted text-sm tracking-widest uppercase font-medium">
                 ({restaurant.review_count} {restaurant.review_count === 1 ? 'review' : 'reviews'})
               </span>
             </div>
           ) : (
-            <p className="text-text-secondary">No ratings yet.</p>
+            <p className="text-text-secondary text-sm uppercase tracking-widest">No feedback yet.</p>
           )}
         </div>
 
         <div>
           {!isAuthenticated ? (
-            <p className="text-sm text-text-muted italic">Log in to leave a review.</p>
+            <p className="text-sm text-text-muted font-serif italic">Log in to leave a review.</p>
           ) : eligibleOrderId ? (
-            <Button variant="accent" onClick={handleOpenCreateModal}>
-              Leave Review
+            <Button variant="primary" onClick={handleOpenCreateModal}>
+              Write a Review
             </Button>
           ) : (
-            <p className="text-sm text-text-muted italic max-w-xs text-right">
-              Only customers who completed an order can leave a review.
+            <p className="text-sm text-text-muted font-serif italic max-w-xs text-right">
+              Only verified orders can leave feedback.
             </p>
           )}
         </div>
       </div>
 
       {successMessage && (
-        <div className="mb-6">
-          <Alert variant="success" title="Success" message={successMessage} />
+        <div className="mb-8">
+          <Alert variant="success" title="Feedback Recorded" message={successMessage} />
         </div>
       )}
 
       {/* Review List or Empty State */}
       {!hasReviews ? (
         <EmptyState
-          title="No reviews yet"
-          description="Be the first to share your experience with others!"
+          title="No feedback yet"
+          description="Be the first to share your experience."
           icon={
-            <svg className="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            <svg className="h-10 w-10 text-text-muted opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="square" strokeLinejoin="miter" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           }
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {reviews.map(review => (
             <ReviewCard
               key={review.id}
@@ -159,16 +157,16 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
       <Modal
         isOpen={!!reviewToDelete}
         onClose={() => setReviewToDelete(null)}
-        title="Delete Review"
+        title="Remove Feedback"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setReviewToDelete(null)}>Cancel</Button>
-            <Button variant="danger" onClick={() => void confirmDelete()}>Delete</Button>
+            <Button variant="primary" onClick={() => void confirmDelete()} className="bg-status-error border-status-error text-white hover:bg-status-error/90 hover:border-status-error/90">Remove</Button>
           </div>
         }
       >
-        <p className="text-text-primary">
-          Are you sure you want to delete this review? This action cannot be undone.
+        <p className="text-text-primary text-lg font-serif italic">
+          Are you sure you want to remove your feedback? This action is permanent.
         </p>
       </Modal>
     </div>

@@ -30,7 +30,7 @@ export const Modal: FC<ModalProps> = ({ isOpen, onClose, title, children, footer
         aria-hidden="true"
       />
       
-      <div className="relative w-full max-w-md transform overflow-hidden rounded-xl bg-surface shadow-elevated transition-all">
+      <div className="relative w-full max-w-md overflow-hidden rounded-none bg-surface shadow-elevated animate-slide-up">
         <div className="border-b border-border-default px-6 py-4 flex justify-between items-center">
           <h2 className="text-lg font-bold text-text-primary">{title}</h2>
           <button

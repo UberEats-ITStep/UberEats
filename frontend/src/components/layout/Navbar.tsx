@@ -26,24 +26,23 @@ export const Navbar: FC = () => {
   };
 
   const navLinkClass = (path: string) =>
-    `text-sm font-medium transition-base py-2 px-1 border-b-2 ${
+    `text-sm font-medium transition-base py-1 border-b ${
       isActive(path)
-        ? 'border-accent text-accent font-semibold'
-        : 'border-transparent text-slate-200 hover:text-white hover:border-slate-400'
+        ? 'border-primary text-primary'
+        : 'border-transparent text-text-secondary hover:text-primary hover:border-border-default'
     }`;
 
   const mobileNavLinkClass = (path: string) =>
-    `block py-2.5 px-4 rounded-md text-base font-medium transition-base ${
+    `block py-3 px-4 text-base font-medium transition-base ${
       isActive(path)
-        ? 'bg-primary-hover text-accent font-semibold'
-        : 'text-slate-200 hover:bg-primary-hover hover:text-white'
+        ? 'bg-secondary text-primary'
+        : 'text-text-secondary hover:bg-secondary hover:text-primary'
     }`;
 
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value) {
       setSearchParams({ q: value });
-      // If we are not on home, redirect to home with search
       if (location.pathname !== '/' && location.pathname !== '/restaurants') {
          navigate(`/?q=${encodeURIComponent(value)}`);
       }
@@ -54,21 +53,21 @@ export const Navbar: FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-primary text-text-inverse shadow-elevated">
+    <header className="sticky top-0 z-50 bg-surface/90 text-text-primary backdrop-blur-md border-b border-border-default">
       <div className="container-page">
         <nav className="flex h-16 items-center justify-between gap-4 md:gap-8">
           {/* Brand Logo & Links */}
-          <div className="flex items-center gap-8 shrink-0">
+          <div className="flex items-center gap-10 shrink-0">
             <Link
               to="/"
               onClick={closeMenu}
-              className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-white transition-base hover:opacity-90"
+              className="flex items-center text-2xl font-bold tracking-tight transition-base hover:opacity-80"
             >
-              <span>Bite<span className="text-accent">Up</span></span>
+              <span>Bite<span className="font-serif italic font-normal tracking-normal">Up.</span></span>
             </Link>
 
             {/* Desktop Nav Links */}
-            <div className="hidden lg:flex lg:items-center lg:gap-6">
+            <div className="hidden lg:flex lg:items-center lg:gap-8">
               <Link to="/" className={navLinkClass('/')}>
                 Restaurants
               </Link>
@@ -86,17 +85,17 @@ export const Navbar: FC = () => {
           </div>
 
           {/* Flexible Search Bar */}
-          <div className="flex-1 max-w-2xl hidden sm:block">
+          <div className="flex-1 max-w-md hidden sm:block">
              <Input
                 type="search"
-                placeholder="Search restaurants or cuisines..."
+                placeholder="Search..."
                 aria-label="Search restaurants or cuisines"
                 value={searchQuery}
                 onChange={handleSearchChange}
-                className="w-full bg-white/10 text-white placeholder-slate-300 border-transparent focus:bg-white focus:text-text-primary focus:border-accent"
+                className="w-full bg-secondary border-transparent focus:bg-surface focus:border-border-focus"
                 leftIcon={
-                   <svg className="h-5 w-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                   <svg className="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                    </svg>
                 }
              />
@@ -109,20 +108,20 @@ export const Navbar: FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsDrawerOpen(true)}
-                  className="relative rounded-sm p-2 text-slate-200 hover:bg-primary-hover hover:text-white focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="relative rounded-none p-2 text-text-primary hover:bg-secondary focus:outline-none focus:ring-1 focus:ring-primary"
                   aria-label="Open cart"
                 >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
                   {itemCount > 0 && (
-                    <span className="absolute top-0 right-0 inline-flex items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-xs font-bold leading-none text-text-primary transform translate-x-1/4 -translate-y-1/4">
+                    <span className="absolute top-0 right-0 inline-flex items-center justify-center rounded-none bg-primary px-1.5 py-0.5 text-xs font-bold leading-none text-surface transform translate-x-1/4 -translate-y-1/4">
                       {itemCount}
                     </span>
                   )}
                 </button>
                 <Button
-                  variant="ghost-inverse"
+                  variant="ghost"
                   size="sm"
                   onClick={logout}
                 >
@@ -133,14 +132,14 @@ export const Navbar: FC = () => {
               <div className="flex items-center gap-3">
                 <Link to="/login">
                   <Button
-                    variant="ghost-inverse"
+                    variant="ghost"
                     size="sm"
                   >
                     Log in
                   </Button>
                 </Link>
                 <Link to="/register">
-                  <Button variant="accent" size="sm">
+                  <Button variant="primary" size="sm">
                     Sign up
                   </Button>
                 </Link>
@@ -154,14 +153,14 @@ export const Navbar: FC = () => {
               <button
                 type="button"
                 onClick={() => setIsDrawerOpen(true)}
-                className="relative rounded-sm p-2 text-slate-200 hover:bg-primary-hover hover:text-white focus:outline-none focus:ring-2 focus:ring-accent"
+                className="relative rounded-none p-2 text-text-primary hover:bg-secondary focus:outline-none focus:ring-1 focus:ring-primary"
                 aria-label="Open cart"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
                 {itemCount > 0 && (
-                  <span className="absolute top-0 right-0 inline-flex items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-xs font-bold leading-none text-text-primary transform translate-x-1/4 -translate-y-1/4">
+                  <span className="absolute top-0 right-0 inline-flex items-center justify-center rounded-none bg-primary px-1.5 py-0.5 text-xs font-bold leading-none text-surface transform translate-x-1/4 -translate-y-1/4">
                     {itemCount}
                   </span>
                 )}
@@ -170,17 +169,17 @@ export const Navbar: FC = () => {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="inline-flex items-center justify-center rounded-sm p-2 text-slate-200 hover:bg-primary-hover hover:text-white focus:outline-none focus:ring-2 focus:ring-accent"
+              className="inline-flex items-center justify-center rounded-none p-2 text-text-primary hover:bg-secondary focus:outline-none focus:ring-1 focus:ring-primary"
               aria-expanded={mobileMenuOpen}
               aria-label="Toggle navigation menu"
             >
               <span className="sr-only">Open main menu</span>
               {mobileMenuOpen ? (
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               )}
@@ -192,14 +191,14 @@ export const Navbar: FC = () => {
         <div className="sm:hidden pb-3">
            <Input
               type="search"
-              placeholder="Search restaurants..."
+              placeholder="Search..."
               aria-label="Search restaurants"
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full bg-white/10 text-white placeholder-slate-300 border-transparent focus:bg-white focus:text-text-primary focus:border-accent"
+              className="w-full bg-secondary border-transparent focus:bg-surface focus:border-border-focus"
               leftIcon={
-                 <svg className="h-5 w-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                 <svg className="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                  </svg>
               }
            />
@@ -208,7 +207,7 @@ export const Navbar: FC = () => {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="border-t border-primary-hover bg-primary px-4 pt-2 pb-6 md:hidden">
+        <div className="border-t border-border-default bg-surface px-4 pt-2 pb-6 md:hidden">
           <div className="space-y-1">
             <Link to="/" onClick={closeMenu} className={mobileNavLinkClass('/')}>
               Restaurants
@@ -223,13 +222,13 @@ export const Navbar: FC = () => {
                 </Link>
                 <div className="pt-4">
                   <Button
-                    variant="ghost-inverse"
+                    variant="ghost"
                     fullWidth
                     onClick={() => {
                       closeMenu();
                       logout();
                     }}
-                    className="justify-start text-status-error hover:bg-primary-hover hover:text-red-400"
+                    className="justify-start text-status-error hover:bg-secondary"
                   >
                     Logout
                   </Button>
@@ -239,7 +238,7 @@ export const Navbar: FC = () => {
               <div className="space-y-3 pt-4">
                 <Link to="/login" onClick={closeMenu} className="block">
                   <Button
-                    variant="outline-inverse"
+                    variant="outline"
                     fullWidth
                     className="justify-center"
                   >
@@ -247,7 +246,7 @@ export const Navbar: FC = () => {
                   </Button>
                 </Link>
                 <Link to="/register" onClick={closeMenu} className="block">
-                  <Button variant="accent" fullWidth className="justify-center font-bold">
+                  <Button variant="primary" fullWidth className="justify-center">
                     Sign up
                   </Button>
                 </Link>

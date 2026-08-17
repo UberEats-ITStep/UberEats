@@ -47,8 +47,8 @@ export const Select: FC<SelectProps> = ({
     <div className={`relative inline-block text-left ${className}`} ref={containerRef}>
       <button
         type="button"
-        className={`flex items-center justify-between gap-2 rounded-lg border border-border-default bg-surface px-4 py-1.5 text-sm font-medium text-text-secondary transition-base hover:border-accent hover:text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent ${
-          isOpen ? 'border-accent text-text-primary ring-1 ring-accent' : ''
+        className={`flex items-center justify-between gap-2 rounded-none border border-border-default bg-surface px-4 py-1.5 text-sm font-medium text-text-secondary transition-base hover:border-primary hover:text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${
+          isOpen ? 'border-primary text-text-primary ring-1 ring-primary' : ''
         }`}
         onClick={() => setIsOpen(!isOpen)}
         aria-haspopup="listbox"
@@ -57,17 +57,17 @@ export const Select: FC<SelectProps> = ({
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
         <svg
-          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-accent' : 'text-slate-400'}`}
+          className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-primary' : 'text-text-muted'}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-2 w-max min-w-[140px] origin-top-right rounded-lg border border-border-default bg-surface shadow-elevated animate-fade-in overflow-hidden">
+        <div className="absolute z-50 mt-1 w-max min-w-[140px] origin-top-right rounded-none border border-border-default bg-surface shadow-elevated animate-fade-in overflow-hidden">
           <ul
             className="max-h-60 overflow-auto focus:outline-none"
             role="listbox"
@@ -79,8 +79,8 @@ export const Select: FC<SelectProps> = ({
                 id={`option-${option.value}`}
                 role="option"
                 aria-selected={value === option.value}
-                className={`relative cursor-pointer select-none py-2 px-4 text-sm transition-base hover:bg-primary-hover hover:text-white ${
-                  value === option.value ? 'bg-primary/5 text-accent font-semibold' : 'text-text-primary'
+                className={`relative cursor-pointer select-none py-2 px-4 text-sm transition-base hover:bg-secondary hover:text-text-primary ${
+                  value === option.value ? 'bg-secondary text-primary font-bold' : 'text-text-primary'
                 }`}
                 onClick={() => handleSelect(option.value)}
               >

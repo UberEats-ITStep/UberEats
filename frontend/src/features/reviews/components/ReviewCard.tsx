@@ -26,13 +26,13 @@ export const ReviewCard: FC<ReviewCardProps> = ({
   const authorName = review.client_email ? review.client_email.split('@')[0] : 'Anonymous';
 
   return (
-    <div className="bg-surface rounded-xl p-6 shadow-subtle border border-border-default flex flex-col gap-4">
+    <div className="bg-surface rounded-none p-8 border border-border-default flex flex-col gap-5">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-bold text-text-primary text-lg mb-1">{authorName}</h3>
-          <div className="flex items-center gap-3">
+          <h3 className="font-bold text-text-primary text-xl mb-1 leading-tight">{authorName}</h3>
+          <div className="flex items-center gap-3 mt-2">
             <RatingStars rating={review.rating} size="sm" />
-            <span className="text-sm text-text-muted">{formattedDate}</span>
+            <span className="text-xs uppercase tracking-widest text-text-muted">{formattedDate}</span>
           </div>
         </div>
         
@@ -43,7 +43,6 @@ export const ReviewCard: FC<ReviewCardProps> = ({
                 variant="ghost" 
                 size="sm" 
                 onClick={() => onEdit(review)}
-                className="text-text-secondary hover:text-primary"
               >
                 Edit
               </Button>
@@ -53,7 +52,7 @@ export const ReviewCard: FC<ReviewCardProps> = ({
                 variant="ghost" 
                 size="sm" 
                 onClick={() => onDelete(review)}
-                className="text-status-error hover:bg-red-50 hover:text-red-700"
+                className="text-status-error hover:bg-secondary"
               >
                 Delete
               </Button>
@@ -63,8 +62,8 @@ export const ReviewCard: FC<ReviewCardProps> = ({
       </div>
 
       {review.comment && (
-        <p className="text-text-secondary leading-relaxed whitespace-pre-wrap">
-          {review.comment}
+        <p className="text-text-secondary leading-relaxed whitespace-pre-wrap font-serif italic text-lg mt-2">
+          "{review.comment}"
         </p>
       )}
     </div>

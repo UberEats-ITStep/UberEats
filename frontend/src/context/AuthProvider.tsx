@@ -43,6 +43,10 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const login = async (credentials: LoginCredentials) => {
     const { access, refresh } = await authApi.login(credentials);
+    await loginWithTokens(access, refresh);
+  };
+
+  const loginWithTokens = async (access: string, refresh: string) => {
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
 
@@ -57,7 +61,6 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const register = async (credentials: RegisterCredentials) => {
     await authApi.register(credentials);
-    await login({ email: credentials.email, password: credentials.password });
   };
 
   const logout = () => {
@@ -71,6 +74,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         isAuthenticated: profile !== null,
         isLoading,
         login,
+        loginWithTokens,
         register,
         logout,
       }}
