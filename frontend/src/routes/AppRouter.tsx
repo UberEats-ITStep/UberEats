@@ -7,6 +7,7 @@ import Register from '../pages/Register';
 import VerifyEmail from '../pages/VerifyEmail';
 import NotFound from '../pages/NotFound';
 import OrderHistory from '../pages/OrderHistory';
+import OrderDetails from '../pages/OrderDetails';
 import Profile from '../pages/Profile';
 import RestaurantDetails from '../pages/RestaurantDetails';
 import Checkout from '../pages/Checkout';
@@ -30,6 +31,7 @@ const AppRouter: React.FC = () => {
           <Route element={<ProtectedRoute />}>
             <Route path="/profile" element={<Profile />} />
             <Route path="/orders" element={<OrderHistory />} />
+            <Route path="/orders/:orderId" element={<OrderDetails />} />
             <Route path="/checkout" element={<Checkout />} />
           </Route>
 
