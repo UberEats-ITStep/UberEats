@@ -175,3 +175,41 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
             return super().validate(attrs)
         except AuthenticationFailed as error:
             raise AuthenticationFailed('Incorrect password.') from error
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(
+        write_only=True,
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+    )
+    confirm_password = serializers.CharField(
+        write_only=True,
+    )
+
+    def validate(self, attrs):
+        if not self.context["request"].user.check_password(attrs["current_password"]):
+            raise serializers.ValidationError({
+                "current_password": "Incorrect password"
+            })        
+        if attrs["new_password"] != attrs["confirm_password"]:
+            raise serializers.ValidationError({
+                "confirm_password": "Passwords do not match"
+            })
+        if attrs["current_password"] == attrs["new_password"]:
+                    raise serializers.ValidationError({
+                        "new_password": "New password is the same as old"
+                    })
+
+        validate_password(
+            attrs["new_password"],
+            self.context["request"].user
+        )
+        return attrs
+
+    def save(self, **kwargs):
+        user = self.context["request"].user
+        password = self.validated_data["new_password"]
+        user.set_password(password)
+        user.save()

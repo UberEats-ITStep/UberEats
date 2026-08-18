@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import User
 from .serializers import (
@@ -11,6 +13,7 @@ from .serializers import (
     ProfileSerializer,
     RegisterSerializer,
     ResetPasswordSerializer,
+    ChangePasswordSerializer,
 )
 from .services.password_reset import PasswordResetService
 
@@ -71,3 +74,32 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user.profile
+
+class ChangePasswordView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'change_password'
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={"request": request}
+            )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        refresh_token = request.data.get("refresh_token")
+
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except TokenError:
+                pass
+
+        return Response(
+            {
+                "detail": "Password changed successfully. Please log in again."
+            },
+            status=status.HTTP_200_OK
+        )

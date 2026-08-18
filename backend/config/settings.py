@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
 
     # --- APPS ---
     'restaurants',
@@ -184,6 +185,10 @@ REST_FRAMEWORK = {
             'PASSWORD_RESET_CONFIRM_THROTTLE_RATE',
             '10/hour',
         ),
+        'change_password': os.getenv(
+            'CHANGE_PASSWORD_THROTTLE_RATE',
+            '5/hour',
+        ),
     },
 }
 
@@ -191,6 +196,9 @@ from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
 # Order Lifecycle Simulation (Development Only)
