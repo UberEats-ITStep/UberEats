@@ -1,10 +1,18 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
+
 from .models import User
-from .serializers import EmailTokenObtainPairSerializer, RegisterSerializer, ProfileSerializer
+from .serializers import (
+    EmailTokenObtainPairSerializer,
+    ForgotPasswordSerializer,
+    ProfileSerializer,
+    RegisterSerializer,
+    ResetPasswordSerializer,
+)
+from .services.password_reset import PasswordResetService
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -17,6 +25,48 @@ class LoginView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
     throttle_scope = 'auth_login'
 
+
+class ForgotPasswordView(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'password_reset_request'
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        PasswordResetService.request_reset(serializer.validated_data['email'])
+        return Response(
+            {'detail': 'If an account exists, a reset code has been sent.'},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResetPasswordView(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = 'password_reset_confirm'
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        password_reset = PasswordResetService.reset_password(
+            serializer.validated_data['email'],
+            serializer.validated_data['verification_code'],
+            serializer.validated_data['new_password'],
+        )
+        if not password_reset:
+            return Response(
+                {'detail': 'The verification code is invalid or expired.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {'detail': 'Password reset successful.'},
+            status=status.HTTP_200_OK,
+        )
+
+
 class ProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = ProfileSerializer
@@ -24,7 +74,7 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user.profile
 
-from .services import verify_user_code, generate_verification_code, send_verification_email
+from .services.email_verification import verify_user_code, generate_verification_code, send_verification_email
 
 class VerifyEmailView(APIView):
     permission_classes = (permissions.AllowAny,)

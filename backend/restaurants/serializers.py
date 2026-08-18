@@ -1,6 +1,26 @@
 from rest_framework import serializers
 
-from .models import Category, Cuisine, MenuItem, Restaurant, OpeningHours
+from .models import (
+    Category, Cuisine, DEFAULT_MENU_ITEM_IMAGE_URL,
+    DEFAULT_RESTAURANT_IMAGE_URL, MenuItem, OpeningHours, Restaurant,
+)
+
+
+class ImageURLMixin:
+    def _resolve_image_url(self, file_field, legacy_url, default_url):
+        request = self.context.get("request")
+        if file_field:
+            try:
+                url = file_field.url
+            except ValueError:
+                url = None
+            if url:
+                return request.build_absolute_uri(url) if request else url
+        if legacy_url:
+            return legacy_url
+        if default_url and request:
+            return request.build_absolute_uri(default_url)
+        return default_url
 
 
 class CuisineSerializer(serializers.ModelSerializer):
@@ -15,14 +35,8 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class MenuItemSerializer(serializers.ModelSerializer):
-    image_url = serializers.SerializerMethodField()
-
-    def get_image_url(self, obj):
-        if not obj.image:
-            return None
-        request = self.context.get("request")
-        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MenuItem
@@ -42,6 +56,18 @@ class MenuItemSerializer(serializers.ModelSerializer):
             "calories",
             "slug",
         )
+        read_only_fields = ("slug",)
+
+    def get_image_url(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Keep the established `image` response while also exposing the legacy
+        # `image_url` alias. Unlike SerializerMethodField, ImageField stays
+        # writable for multipart uploads and explicit removal with null.
+        data["image"] = data["image_url"]
+        return data
 
     def validate_price(self, value):
         if value <= 0:
@@ -67,15 +93,9 @@ class MenuItemSerializer(serializers.ModelSerializer):
         return data
 
 
-class RestaurantMenuItemSerializer(serializers.ModelSerializer):
+class RestaurantMenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
-    image_url = serializers.SerializerMethodField()
-
-    def get_image_url(self, obj):
-        if not obj.image:
-            return None
-        request = self.context.get("request")
-        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+    image_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MenuItem
@@ -96,10 +116,19 @@ class RestaurantMenuItemSerializer(serializers.ModelSerializer):
             "slug",
         )
 
+    def get_image_url(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_MENU_ITEM_IMAGE_URL)
 
-class RestaurantListSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["image"] = data["image_url"]
+        return data
+
+
+class RestaurantListSerializer(ImageURLMixin, serializers.ModelSerializer):
     cuisine_name = serializers.CharField(source="cuisine.name", read_only=True)
     is_open_now = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Restaurant
@@ -119,6 +148,9 @@ class RestaurantListSerializer(serializers.ModelSerializer):
             "is_open_now",
         )
 
+    def get_image_url(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_RESTAURANT_IMAGE_URL)
+
     def get_is_open_now(self, obj):
         return obj.is_open_now
 
@@ -137,6 +169,10 @@ RestaurantSerializer = RestaurantListSerializer
 
 
 class OpeningHoursSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OpeningHours
+        fields = ("id", "day_type", "opens_at", "closes_at")
+
     def validate(self, data):
         opens_at = data.get("opens_at", getattr(self.instance, "opens_at", None))
         closes_at = data.get("closes_at", getattr(self.instance, "closes_at", None))
@@ -146,37 +182,13 @@ class OpeningHoursSerializer(serializers.ModelSerializer):
             })
         return data
 
-    class Meta:
-        model = OpeningHours
-        fields = ("id", "day_type", "opens_at", "closes_at")
 
-
-class RestaurantDetailSerializer(serializers.ModelSerializer):
+class RestaurantDetailSerializer(ImageURLMixin, serializers.ModelSerializer):
     cuisine_name = serializers.CharField(source="cuisine.name", read_only=True)
     is_open_now = serializers.SerializerMethodField()
     categories = serializers.SerializerMethodField()
     opening_hours = OpeningHoursSerializer(many=True, read_only=True)
-
-    def get_is_open_now(self, obj):
-        return obj.is_open_now
-
-    def get_categories(self, obj):
-        grouped_categories = {}
-
-        for item in obj.menu_items.all():
-            category_id = item.category_id
-            if category_id not in grouped_categories:
-                grouped_categories[category_id] = {
-                    "id": category_id,
-                    "name": item.category.name,
-                    "menu_items": [],
-                }
-
-            grouped_categories[category_id]["menu_items"].append(
-                RestaurantMenuItemSerializer(item, context=self.context).data
-            )
-
-        return list(grouped_categories.values())
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Restaurant
@@ -197,3 +209,27 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
             "opening_hours",
             "categories",
         )
+
+    def get_is_open_now(self, obj):
+        return obj.is_open_now
+
+    def get_image_url(self, obj):
+        return self._resolve_image_url(obj.image, obj.image_url, DEFAULT_RESTAURANT_IMAGE_URL)
+
+    def get_categories(self, obj):
+        grouped_categories = {}
+
+        for item in obj.menu_items.all():
+            category_id = item.category_id
+            if category_id not in grouped_categories:
+                grouped_categories[category_id] = {
+                    "id": category_id,
+                    "name": item.category.name,
+                    "menu_items": [],
+                }
+
+            grouped_categories[category_id]["menu_items"].append(
+                RestaurantMenuItemSerializer(item, context=self.context).data
+            )
+
+        return list(grouped_categories.values())

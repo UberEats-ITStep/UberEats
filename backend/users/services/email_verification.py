@@ -6,7 +6,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 from django.utils.html import strip_tags
 
-from .models import VerificationCode
+from users.models import VerificationCode
 
 
 def generate_verification_code(user, purpose="EMAIL_VERIFICATION"):

@@ -110,6 +110,52 @@ Response (`200 OK`):
 }
 ```
 
+### Forgot password
+
+`POST /api/auth/forgot-password/`
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/forgot-password/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+```
+
+The response is always `200 OK` with the same message, whether or not the email
+belongs to an account. This prevents email enumeration. When the account exists,
+the configured SMTP provider sends a six-digit code. Requests during the resend
+cooldown do not send a second code.
+
+```json
+{
+  "detail": "If an account exists, a reset code has been sent."
+}
+```
+
+### Reset password
+
+`POST /api/auth/reset-password/`
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/reset-password/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email":"user@example.com",
+    "verification_code":"123456",
+    "new_password":"NewSecurePass123!",
+    "confirm_password":"NewSecurePass123!"
+  }'
+```
+
+The code is single-use and expires after `PASSWORD_RESET_CODE_TTL_SECONDS`.
+Invalid or expired codes return `400 Bad Request` without identifying the cause.
+
+### Password reset configuration
+
+Set the SMTP and password reset values from `.env.example` in `.env` before using
+the endpoints. The `EMAIL_HOST_PASSWORD` value must remain local to the runtime
+environment and must never be committed. For multi-instance deployments, configure
+a shared Django cache so DRF throttling is enforced across all application instances.
+
 ### Profile
 
 `GET /api/profile/` requires an access token.

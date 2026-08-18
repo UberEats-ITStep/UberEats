@@ -1,3 +1,5 @@
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import RegexValidator
 from django.db import transaction
 from rest_framework import serializers
@@ -127,7 +129,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.profile.save()
         
         # Generate and send verification email
-        from .services import generate_verification_code, send_verification_email
+        from .services.email_verification import generate_verification_code, send_verification_email
         plaintext_code = generate_verification_code(user)
         try:
             send_verification_email(user, plaintext_code)
@@ -136,6 +138,42 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise ValidationError({'detail': str(e)})
             
         return user
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value.lower()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    verification_code = serializers.RegexField(
+        regex=r'^\d{6}$',
+        write_only=True,
+    )
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    confirm_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_email(self, value):
+        return value.lower()
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['confirm_password']:
+            raise serializers.ValidationError(
+                {'confirm_password': 'Passwords do not match.'}
+            )
+
+        user = User.objects.filter(email__iexact=attrs['email']).first()
+        try:
+            validate_password(attrs['new_password'], user)
+        except DjangoValidationError as error:
+            raise serializers.ValidationError(
+                {'new_password': list(error.messages)}
+            ) from error
+
+        return attrs
 
 
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
