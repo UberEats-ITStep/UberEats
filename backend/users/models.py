@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 class User(AbstractUser):
@@ -23,6 +24,7 @@ class User(AbstractUser):
 class VerificationCode(models.Model):
     class Purpose(models.TextChoices):
         PASSWORD_RESET = 'PASSWORD_RESET', 'Password reset'
+        EMAIL_VERIFICATION = 'EMAIL_VERIFICATION', 'Email Verification'
 
     user = models.ForeignKey(
         User,
@@ -30,7 +32,7 @@ class VerificationCode(models.Model):
         related_name='verification_codes',
     )
     code_hash = models.CharField(max_length=128)
-    purpose = models.CharField(max_length=32, choices=Purpose.choices)
+    purpose = models.CharField(max_length=32, choices=Purpose.choices, default=Purpose.EMAIL_VERIFICATION)
     expires_at = models.DateTimeField(db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -38,6 +40,9 @@ class VerificationCode(models.Model):
         indexes = [
             models.Index(fields=['user', 'purpose', 'created_at']),
         ]
+
+    def is_valid(self):
+        return timezone.now() <= self.expires_at
 
 
 class Profile(models.Model):
@@ -47,22 +52,6 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.user.email} Profile"
-
-from django.utils import timezone
-
-class VerificationCode(models.Model):
-    PURPOSE_CHOICES = (
-        ('EMAIL_VERIFICATION', 'Email Verification'),
-        ('PASSWORD_RESET', 'Password Reset'),
-    )
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='verification_codes')
-    purpose = models.CharField(max_length=50, choices=PURPOSE_CHOICES, default='EMAIL_VERIFICATION')
-    code_hash = models.CharField(max_length=128)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField()
-    
-    def is_valid(self):
-        return timezone.now() <= self.expires_at
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
