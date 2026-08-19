@@ -17,15 +17,5 @@ class Migration(migrations.Migration):
             name='is_verified',
             field=models.BooleanField(default=False),
         ),
-        migrations.CreateModel(
-            name='VerificationCode',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('purpose', models.CharField(choices=[('EMAIL_VERIFICATION', 'Email Verification'), ('PASSWORD_RESET', 'Password Reset')], default='EMAIL_VERIFICATION', max_length=50)),
-                ('code_hash', models.CharField(max_length=128)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('expires_at', models.DateTimeField()),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='verification_codes', to=settings.AUTH_USER_MODEL)),
-            ],
-        ),
+
     ]

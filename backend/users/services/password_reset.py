@@ -30,7 +30,7 @@ class PasswordResetService:
             return
 
         try:
-            email_sent = EmailService.send_password_reset_code(user.email, code)
+            email_sent = EmailService.send_password_reset_code(user, code)
         except Exception:
             logger.exception('Unable to send password reset email.')
             email_sent = False

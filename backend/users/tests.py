@@ -438,7 +438,7 @@ class PasswordResetApiTests(APITestCase):
             UserModel.objects.create_user(
                 username='reset.user',
                 email='reset@example.com',
-                password='CurrentPass123!',
+                password='CurrentPass123!', is_verified=True,
             ),
         )
         self.forgot_password_url = reverse('forgot-password')
@@ -668,3 +668,320 @@ class PasswordResetApiTests(APITestCase):
         throttled_response = self.reset_password('000000')
 
         self.assertEqual(throttled_response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+class ChangePasswordApiTests(APITestCase):
+    def setUp(self) -> None:
+        cache.clear()
+        self.user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='change.password.user',
+                email='change@example.com',
+                password='CurrentPass123!', is_verified=True,
+                role='CLIENT',
+            ),
+        )
+
+        self.change_password_url = reverse('change-password')
+        self.login_url = reverse('login')
+        self.profile_url = reverse('profile')
+
+    def authenticate(self) -> dict[str, str]:
+        response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {
+                    'email': self.user.email,
+                    'password': 'CurrentPass123!',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        return cast(dict[str, str], response.data)
+
+    def change_password(
+        self,
+        access_token: str,
+        refresh_token: str,
+        current_password: str = 'CurrentPass123!',
+        new_password: str = 'NewPassword123!',
+        confirm_password: str = 'NewPassword123!',
+    ) -> Response:
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {access_token}'
+        )
+
+        return cast(
+            Response,
+            self.client.post(
+                self.change_password_url,
+                {
+                    'current_password': current_password,
+                    'new_password': new_password,
+                    'confirm_password': confirm_password,
+                    'refresh_token': refresh_token,
+                },
+                format='json',
+            ),
+        )
+
+    def test_change_password_successfully(self) -> None:
+        login_data = self.authenticate()
+
+        response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data['detail'],
+            'Password changed successfully. Please log in again.',
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertTrue(
+            self.user.check_password('NewPassword123!')
+        )
+        self.assertFalse(
+            self.user.check_password('CurrentPass123!')
+        )
+
+    def test_change_password_rejects_incorrect_current_password(self) -> None:
+        login_data = self.authenticate()
+
+        response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+            current_password='WrongPassword123!',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn(
+            'current_password',
+            response.data,
+        )
+
+        self.user.refresh_from_db()
+
+        self.assertTrue(
+            self.user.check_password('CurrentPass123!')
+        )
+
+    def test_change_password_rejects_mismatched_passwords(self) -> None:
+        login_data = self.authenticate()
+
+        response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+            new_password='NewPassword123!',
+            confirm_password='DifferentPassword123!',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn(
+            'confirm_password',
+            response.data,
+        )
+
+    def test_change_password_rejects_invalid_new_password(self) -> None:
+        login_data = self.authenticate()
+
+        response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+            new_password='123',
+            confirm_password='123',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn(
+            'non_field_errors',
+            response.data,
+        )
+
+    def test_change_password_rejects_same_password(self) -> None:
+        login_data = self.authenticate()
+
+        response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+            new_password='CurrentPass123!',
+            confirm_password='CurrentPass123!',
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+        self.assertIn(
+            'new_password',
+            response.data,
+        )
+
+    def test_change_password_requires_authentication(self) -> None:
+        response = cast(
+            Response,
+            self.client.post(
+                self.change_password_url,
+                {
+                    'current_password': 'CurrentPass123!',
+                    'new_password': 'NewPassword123!',
+                    'confirm_password': 'NewPassword123!',
+                    'refresh_token': 'invalid',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    def test_old_password_no_longer_works_after_change(self) -> None:
+        login_data = self.authenticate()
+
+        response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        old_password_response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {
+                    'email': self.user.email,
+                    'password': 'CurrentPass123!',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(
+            old_password_response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    def test_new_password_allows_login(self) -> None:
+        login_data = self.authenticate()
+
+        response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        new_password_response = cast(
+            Response,
+            self.client.post(
+                self.login_url,
+                {
+                    'email': self.user.email,
+                    'password': 'NewPassword123!',
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(
+            new_password_response.status_code,
+            status.HTTP_200_OK,
+        )
+        self.assertIn('access', new_password_response.data)
+        self.assertIn('refresh', new_password_response.data)
+
+    def test_refresh_token_is_blacklisted_after_password_change(self) -> None:
+        login_data = self.authenticate()
+
+        response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        refresh_response = cast(
+            Response,
+            self.client.post(
+                reverse('token_refresh'),
+                {
+                    'refresh': login_data['refresh'],
+                },
+                format='json',
+            ),
+        )
+
+        self.assertEqual(
+            refresh_response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+    @override_settings(
+        REST_FRAMEWORK={
+            'DEFAULT_THROTTLE_RATES': {
+                'change_password': '2/hour',
+            },
+        },
+    )
+    @patch.object(
+        ScopedRateThrottle,
+        'THROTTLE_RATES',
+        {
+            'change_password': '2/hour',
+        },
+    )
+
+    def test_change_password_throttling(self) -> None:
+        login_data = self.authenticate()
+
+        for _ in range(2):
+            response = self.change_password(
+                login_data['access'],
+                login_data['refresh'],
+                current_password='WrongPassword123!',
+            )
+
+            self.assertEqual(
+                response.status_code,
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        throttled_response = self.change_password(
+            login_data['access'],
+            login_data['refresh'],
+            current_password='WrongPassword123!',
+        )
+
+        self.assertEqual(
+            throttled_response.status_code,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        )

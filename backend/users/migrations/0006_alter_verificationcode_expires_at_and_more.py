@@ -20,8 +20,5 @@ class Migration(migrations.Migration):
             name='purpose',
             field=models.CharField(choices=[('PASSWORD_RESET', 'Password reset'), ('EMAIL_VERIFICATION', 'Email Verification')], default='EMAIL_VERIFICATION', max_length=32),
         ),
-        migrations.AddIndex(
-            model_name='verificationcode',
-            index=models.Index(fields=['user', 'purpose', 'created_at'], name='users_verif_user_id_b033ba_idx'),
-        ),
+
     ]
