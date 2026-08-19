@@ -50,7 +50,7 @@ class EmailService:
               <tr>
                 <td style="padding: 60px 32px 40px 32px; text-align: center; border-bottom: 1px solid #E2E2DF;">
                   <h1 style="margin: 0 0 16px 0; font-family: 'Instrument Serif', 'Playfair Display', Georgia, serif; font-size: 64px; font-weight: 400; font-style: italic; line-height: 1; letter-spacing: -1.5px; color: #191918;">
-                    <span style="color: #007BFF;">Bite</span><span style="color: #FF8C00;">Up</span>
+                    BiteUp
                   </h1>
                   <p style="margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -0.5px; color: #191918;">
                     Password Reset.
