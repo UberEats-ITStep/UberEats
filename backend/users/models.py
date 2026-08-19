@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 class User(AbstractUser):
@@ -13,6 +14,7 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='CLIENT')
     created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
     
     # Require email for authentication
     USERNAME_FIELD = 'email'
@@ -22,6 +24,7 @@ class User(AbstractUser):
 class VerificationCode(models.Model):
     class Purpose(models.TextChoices):
         PASSWORD_RESET = 'PASSWORD_RESET', 'Password reset'
+        EMAIL_VERIFICATION = 'EMAIL_VERIFICATION', 'Email Verification'
 
     user = models.ForeignKey(
         User,
@@ -29,7 +32,7 @@ class VerificationCode(models.Model):
         related_name='verification_codes',
     )
     code_hash = models.CharField(max_length=128)
-    purpose = models.CharField(max_length=32, choices=Purpose.choices)
+    purpose = models.CharField(max_length=32, choices=Purpose.choices, default=Purpose.EMAIL_VERIFICATION)
     expires_at = models.DateTimeField(db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -37,6 +40,9 @@ class VerificationCode(models.Model):
         indexes = [
             models.Index(fields=['user', 'purpose', 'created_at']),
         ]
+
+    def is_valid(self):
+        return timezone.now() <= self.expires_at
 
 
 class Profile(models.Model):

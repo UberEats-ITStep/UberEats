@@ -28,7 +28,7 @@ class UserModelTests(TestCase):
             UserModel.objects.create_user(
                 username='john',
                 email='john@example.com',
-                password='pass12345',
+                password='pass12345', is_verified=True,
                 role='Courier',
             ),
         )
@@ -44,7 +44,7 @@ class UserModelTests(TestCase):
             UserModel.objects.create_user(
                 username='jane',
                 email='jane@example.com',
-                password='pass12345',
+                password='pass12345', is_verified=True,
             ),
         )
 
@@ -61,7 +61,7 @@ class UserModelTests(TestCase):
             UserModel.objects.create_user(
                 username='alex',
                 email='alex@example.com',
-                password='pass12345',
+                password='pass12345', is_verified=True,
             ),
         )
 
@@ -76,7 +76,7 @@ class RegisterApiTests(APITestCase):
         UserModel.objects.create_user(
             username='test.user',
             email='existing@example.com',
-            password='pass12345',
+            password='pass12345', is_verified=True,
         )
 
         response = cast(
@@ -143,7 +143,7 @@ class RegisterApiTests(APITestCase):
         UserModel.objects.create_user(
             username='existing',
             email='existing@example.com',
-            password='TestPass123!',
+            password='TestPass123!', is_verified=True,
         )
 
         response = cast(
@@ -170,7 +170,7 @@ class JwtAuthApiTests(APITestCase):
             UserModel.objects.create_user(
                 username='john',
                 email='john@example.com',
-                password='TestPass123!',
+                password='TestPass123!', is_verified=True,
                 role='CLIENT',
             ),
         )
@@ -359,7 +359,7 @@ class JwtAuthApiTests(APITestCase):
         UserModel.objects.create_user(
             username='jane',
             email='jane@example.com',
-            password='TestPass123!',
+            password='TestPass123!', is_verified=True,
         )
         self.client.force_authenticate(user=self.user)
 
@@ -397,7 +397,7 @@ class JwtAuthApiTests(APITestCase):
             UserModel.objects.create_user(
                 username='jane',
                 email='jane@example.com',
-                password='TestPass123!',
+                password='TestPass123!', is_verified=True,
             ),
         )
         other_user.profile.address = 'Lviv'
@@ -438,7 +438,7 @@ class PasswordResetApiTests(APITestCase):
             UserModel.objects.create_user(
                 username='reset.user',
                 email='reset@example.com',
-                password='CurrentPass123!',
+                password='CurrentPass123!', is_verified=True,
             ),
         )
         self.forgot_password_url = reverse('forgot-password')
@@ -678,7 +678,7 @@ class ChangePasswordApiTests(APITestCase):
             UserModel.objects.create_user(
                 username='change.password.user',
                 email='change@example.com',
-                password='CurrentPass123!',
+                password='CurrentPass123!', is_verified=True,
                 role='CLIENT',
             ),
         )

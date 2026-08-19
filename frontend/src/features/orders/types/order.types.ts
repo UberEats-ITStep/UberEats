@@ -9,8 +9,10 @@ export type OrderStatus =
 export interface OrderItem {
     id: number;
     menu_item: number;
+    menu_item_name?: string;
     quantity: number;
     price: string;
+    subtotal?: string;
 }
 
 export interface Order {
@@ -20,5 +22,6 @@ export interface Order {
     created_at: string;
     delivery_address: string;
     restaurant: number | null; // Backend returns the ID
+    restaurant_name?: string;
     items: OrderItem[];
 }

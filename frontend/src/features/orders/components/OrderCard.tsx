@@ -6,23 +6,11 @@ import { Card } from '../../../components/common';
 import OrderSummaryList, { type SummaryItem } from './OrderSummaryList';
 import { useRestaurantDetails } from '../../restaurants/hooks/useRestaurantDetails';
 import { formatPrice } from '../../../utils/currency';
+import { formatOrderDate } from '../utils/order.utils';
 
 interface OrderCardProps {
     order: Order;
 }
-
-const formatOrderDate = (dateValue: string): string => {
-    const date = new Date(dateValue);
-
-    if (Number.isNaN(date.getTime())) {
-        return dateValue;
-    }
-
-    return new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(date);
-};
 
 const OrderCard: FC<OrderCardProps> = ({ order }) => {
     const { restaurant, isLoading } = useRestaurantDetails(order.restaurant?.toString());
@@ -103,9 +91,17 @@ const OrderCard: FC<OrderCardProps> = ({ order }) => {
                 <OrderSummaryList items={summaryItems} maxDisplay={2} />
             </div>
 
-            <div className="flex items-center justify-between">
-                <span className="text-sm tracking-widest uppercase text-text-secondary font-medium">Total Amount</span>
-                <span className="text-2xl font-serif italic text-text-primary">{formatPrice(order.total_price)}</span>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <span className="text-sm tracking-widest uppercase text-text-secondary font-medium">Total Amount</span>
+                    <span className="ml-4 text-2xl font-serif italic text-text-primary">{formatPrice(order.total_price)}</span>
+                </div>
+                <Link
+                    to={`/orders/${order.id}`}
+                    className="inline-flex items-center justify-center border border-border-default px-5 py-2.5 text-sm font-medium text-text-primary transition-base hover:bg-secondary"
+                >
+                    View order
+                </Link>
             </div>
         </Card>
     );

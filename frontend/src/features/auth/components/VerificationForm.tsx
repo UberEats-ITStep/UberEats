@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { authApi } from '../api/authApi';
 import { getAuthError } from '../utils/getAuthError';
+import { triggerMonochromeConfetti } from '../../../utils/confetti';
 import { Card, Button, Alert } from '../../../components/common';
 
 export const VerificationForm: FC = () => {
@@ -29,20 +30,20 @@ export const VerificationForm: FC = () => {
   const [isVerified, setIsVerified] = useState(false);
   
   const [cooldown, setCooldown] = useState(() => {
-    const storedExpiration = sessionStorage.getItem('resend_expiration');
+    const storedExpiration = sessionStorage.getItem(`resend_expiration_${email}`);
     if (storedExpiration) {
       const remaining = Math.floor((parseInt(storedExpiration, 10) - Date.now()) / 1000);
       if (remaining > 0) {
         return remaining;
       } else {
-        sessionStorage.removeItem('resend_expiration');
+        sessionStorage.removeItem(`resend_expiration_${email}`);
       }
     }
     
     // Automatically start cooldown if navigating from Registration
     if (location.state?.startCooldown) {
       const expireTime = Date.now() + 60000;
-      sessionStorage.setItem('resend_expiration', expireTime.toString());
+      sessionStorage.setItem(`resend_expiration_${email}`, expireTime.toString());
       return 60;
     }
     return 0;
@@ -62,7 +63,7 @@ export const VerificationForm: FC = () => {
     const timer = window.setInterval(() => {
       setCooldown((prev) => {
         if (prev <= 1) {
-          sessionStorage.removeItem('resend_expiration');
+          sessionStorage.removeItem(`resend_expiration_${email}`);
           return 0;
         }
         return prev - 1;
@@ -82,6 +83,7 @@ export const VerificationForm: FC = () => {
       const { access, refresh } = await authApi.verifyEmail(email, submissionCode);
       setIsVerified(true);
       sessionStorage.removeItem('verification_email');
+      triggerMonochromeConfetti();
       
       // Auto-redirect to home after delay to allow animation
       setTimeout(() => {
@@ -110,7 +112,7 @@ export const VerificationForm: FC = () => {
       await authApi.resendVerification(email);
       setSuccess(`A new verification code has been sent to ${email}`);
       const expireTime = Date.now() + 60000;
-      sessionStorage.setItem('resend_expiration', expireTime.toString());
+      sessionStorage.setItem(`resend_expiration_${email}`, expireTime.toString());
       setCooldown(60);
     } catch (err) {
       const errorMsg = getAuthError(err, 'Failed to resend code.');
@@ -119,7 +121,7 @@ export const VerificationForm: FC = () => {
       if (match) {
         const seconds = parseInt(match[1], 10);
         const expireTime = Date.now() + (seconds * 1000);
-        sessionStorage.setItem('resend_expiration', expireTime.toString());
+        sessionStorage.setItem(`resend_expiration_${email}`, expireTime.toString());
         setCooldown(seconds);
       } else {
         setError(errorMsg);
@@ -128,6 +130,17 @@ export const VerificationForm: FC = () => {
       setIsResending(false);
     }
   };
+
+  useEffect(() => {
+    if (location.state?.autoResend && email) {
+      // Clear autoResend to prevent double-firing
+      navigate(location.pathname, { replace: true, state: { ...location.state, autoResend: false } });
+      if (cooldown === 0 && !isResending) {
+        void handleResend();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.autoResend, email]);
 
   const handleChange = (index: number, e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, ''); // only digits
