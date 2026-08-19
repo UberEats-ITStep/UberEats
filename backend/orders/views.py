@@ -24,6 +24,18 @@ class OrderHistoryView(generics.ListAPIView):
         return Order.objects.filter(client=self.request.user).prefetch_related('items__menu_item').order_by('-created_at')
 
 
+class OrderDetailView(generics.RetrieveAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = OrderSerializer
+
+    def get_queryset(self):
+        return (
+            Order.objects.filter(client=self.request.user)
+            .select_related('restaurant')
+            .prefetch_related('items__menu_item')
+        )
+
+
 class OrderStatusView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderStatusSerializer

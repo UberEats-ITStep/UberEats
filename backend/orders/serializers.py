@@ -7,17 +7,27 @@ from .models import Order, OrderItem
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    menu_item_name = serializers.CharField(source='menu_item.name', read_only=True)
+    subtotal = serializers.SerializerMethodField()
+
     class Meta:
         model = OrderItem
-        fields = ['id', 'menu_item', 'quantity', 'price']
+        fields = ['id', 'menu_item', 'menu_item_name', 'quantity', 'price', 'subtotal']
+
+    def get_subtotal(self, obj):
+        return f'{obj.price * obj.quantity:.2f}'
 
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    restaurant_name = serializers.CharField(source='restaurant.name', read_only=True)
 
     class Meta:
         model = Order
-        fields = ['id', 'status', 'total_price', 'delivery_address', 'created_at', 'items', 'restaurant', 'courier']
+        fields = [
+            'id', 'status', 'total_price', 'delivery_address', 'created_at',
+            'items', 'restaurant', 'restaurant_name', 'courier',
+        ]
 
 
 class CheckoutSerializer(serializers.Serializer):

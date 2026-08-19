@@ -108,6 +108,25 @@ class OrderCheckoutApiTests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['id'], order.id)
 
+    def test_user_can_view_complete_order_details(self):
+        order = self.create_order(self.user)
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(reverse('order_detail', args=[order.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['restaurant_name'], self.restaurant.name)
+        self.assertEqual(response.data['items'][0]['menu_item_name'], self.menu_item.name)
+        self.assertEqual(response.data['items'][0]['subtotal'], '10.50')
+
+    def test_user_cannot_view_another_users_order_details(self):
+        order = self.create_order(self.other_user)
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(reverse('order_detail', args=[order.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_user_can_read_order_status(self):
         order = self.create_order(self.user)
         self.client.force_authenticate(user=self.user)
@@ -202,4 +221,3 @@ class OrderSimulationTests(APITestCase):
         
         order.refresh_from_db()
         self.assertEqual(order.status, Order.STATUS_CANCELLED)
-

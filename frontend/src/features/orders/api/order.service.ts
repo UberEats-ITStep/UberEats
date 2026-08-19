@@ -16,6 +16,11 @@ export const orderService = {
         }
         return response.data as Order[];
     },
+
+    async getOrderDetails(orderId: number, signal?: AbortSignal): Promise<Order> {
+        const response = await apiClient.get<Order>(`/orders/${orderId}/`, { signal });
+        return response.data;
+    },
     
     async checkout(delivery_address: string): Promise<Order> {
         const response = await apiClient.post<Order>('/orders/checkout/', { delivery_address });
