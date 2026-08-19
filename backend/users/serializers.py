@@ -103,6 +103,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ['email', 'password', 'role', 'phone_number', 'address']
 
+    @transaction.atomic
     def create(self, validated_data):
         phone_number = validated_data.pop('phone_number', '')
         address = validated_data.pop('address', '')
@@ -126,6 +127,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.profile.phone_number = phone_number or None
         user.profile.address = address or None
         user.profile.save()
+        
+        # Generate and send verification email
+        from .services.email_verification import generate_verification_code, send_verification_email
+        plaintext_code = generate_verification_code(user)
+        try:
+            send_verification_email(user, plaintext_code)
+        except ValueError as e:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'detail': str(e)})
+            
         return user
 
 
@@ -168,8 +179,14 @@ class ResetPasswordSerializer(serializers.Serializer):
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         email = attrs.get('email', '')
-        if not User.objects.filter(email=email).exists():
+        user_queryset = User.objects.filter(email=email)
+        
+        if not user_queryset.exists():
             raise AuthenticationFailed('No account found with this email.')
+            
+        user = user_queryset.first()
+        if not user.is_verified:
+            raise AuthenticationFailed('Your email has not been verified yet. Please verify your email before logging in.')
 
         try:
             return super().validate(attrs)

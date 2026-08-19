@@ -8,6 +8,11 @@ export const getAuthError = (error: unknown, fallback: string): string => {
   }
 
   const data = error.response.data;
+
+  if (typeof data === 'string') {
+    return data;
+  }
+
   if (Array.isArray(data.email) && data.email.some((message) => message.includes('already exists'))) {
     return 'An account with this email already exists.';
   }
@@ -16,6 +21,10 @@ export const getAuthError = (error: unknown, fallback: string): string => {
     return data.detail;
   }
 
-  const firstMessage = Object.values(data)[0];
-  return Array.isArray(firstMessage) ? firstMessage[0] : firstMessage || fallback;
+  if (typeof data === 'object') {
+    const firstMessage = Object.values(data)[0];
+    return Array.isArray(firstMessage) ? firstMessage[0] : (typeof firstMessage === 'string' ? firstMessage : fallback);
+  }
+
+  return fallback;
 };
