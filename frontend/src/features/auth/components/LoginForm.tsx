@@ -112,6 +112,11 @@ const LoginForm: FC = () => {
               placeholder="••••••••"
             />
           </FormField>
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-sm font-semibold text-text-primary underline underline-offset-4 hover:opacity-80">
+              Forgot password?
+            </Link>
+          </div>
         </div>
 
         {requestError && (

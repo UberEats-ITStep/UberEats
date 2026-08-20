@@ -1,9 +1,12 @@
 import apiClient from '../../../api/client';
 import type {
   AuthTokens,
+  ChangePasswordData,
+  DetailResponse,
   LoginCredentials,
   Profile,
   RegisterCredentials,
+  ResetPasswordData,
   RegisteredUser,
 } from '../types/auth.types';
 
@@ -30,5 +33,20 @@ export const authApi = {
 
   resendVerification: async (email: string): Promise<void> => {
     await apiClient.post('/auth/resend-verification/', { email });
+  },
+
+  forgotPassword: async (email: string): Promise<DetailResponse> => {
+    const response = await apiClient.post<DetailResponse>('/auth/forgot-password/', { email });
+    return response.data;
+  },
+
+  resetPassword: async (data: ResetPasswordData): Promise<DetailResponse> => {
+    const response = await apiClient.post<DetailResponse>('/auth/reset-password/', data);
+    return response.data;
+  },
+
+  changePassword: async (data: ChangePasswordData): Promise<DetailResponse> => {
+    const response = await apiClient.post<DetailResponse>('/auth/change-password/', data);
+    return response.data;
   },
 };
