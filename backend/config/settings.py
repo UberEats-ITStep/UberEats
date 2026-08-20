@@ -182,6 +182,7 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.ScopedRateThrottle",
     ),
     "DEFAULT_THROTTLE_RATES": {
+        "ai_recommend": "5/min",
         "auth_login": "10/min",
         "auth_register": "5/min",
         "verify_email": "10/hour",
@@ -251,3 +252,7 @@ CACHES = {
 if {"test", "makemigrations"} & set(sys.argv):
     if "DEFAULT_THROTTLE_CLASSES" in REST_FRAMEWORK:
         REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []
+
+# AI Configuration
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama3-70b-8192')
