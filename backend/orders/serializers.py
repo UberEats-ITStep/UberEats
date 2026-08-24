@@ -21,19 +21,33 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     restaurant_name = serializers.CharField(source='restaurant.name', read_only=True)
+    restaurant_latitude = serializers.DecimalField(source='restaurant.latitude', max_digits=9, decimal_places=6, read_only=True)
+    restaurant_longitude = serializers.DecimalField(source='restaurant.longitude', max_digits=9, decimal_places=6, read_only=True)
 
     class Meta:
         model = Order
         fields = [
-            'id', 'status', 'total_price', 'delivery_address', 'created_at',
-            'items', 'restaurant', 'restaurant_name', 'courier',
+            'id', 'status', 'total_price', 'delivery_address', 
+            'delivery_latitude', 'delivery_longitude', 'created_at',
+            'items', 'restaurant', 'restaurant_name', 
+            'restaurant_latitude', 'restaurant_longitude', 'courier',
         ]
 
 
 class CheckoutSerializer(serializers.Serializer):
     delivery_address = serializers.CharField(required=False, allow_blank=True)
+    delivery_latitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    delivery_longitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
 
     def validate(self, attrs):
+        lat = attrs.get('delivery_latitude')
+        lng = attrs.get('delivery_longitude')
+        if (lat is None) != (lng is None):
+            missing_field = 'delivery_longitude' if lng is None else 'delivery_latitude'
+            raise serializers.ValidationError({
+                missing_field: 'Delivery latitude and longitude must both be set, or both be empty.'
+            })
+
         user = self.context['request'].user
         
         if not hasattr(user, 'cart') or not user.cart.items.exists():
@@ -58,6 +72,8 @@ class CheckoutSerializer(serializers.Serializer):
             client=user,
             restaurant=restaurant,
             delivery_address=validated_data.get('delivery_address', ''),
+            delivery_latitude=validated_data.get('delivery_latitude'),
+            delivery_longitude=validated_data.get('delivery_longitude'),
         )
 
         total_price = 0

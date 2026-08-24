@@ -54,6 +54,9 @@ class Command(BaseCommand):
         if created:
             client_user.set_password("password123")
             client_user.save()
+            client_user.profile.latitude = Decimal("50.620000")
+            client_user.profile.longitude = Decimal("26.250000")
+            client_user.profile.save()
             self.stdout.write(self.style.SUCCESS(f" Created Client: {client_email}"))
         else:
             if client_user.role != "CLIENT":
@@ -69,6 +72,9 @@ class Command(BaseCommand):
         if created:
             courier_user.set_password("password123")
             courier_user.save()
+            courier_user.profile.latitude = Decimal("50.615000")
+            courier_user.profile.longitude = Decimal("26.260000")
+            courier_user.profile.save()
             self.stdout.write(self.style.SUCCESS(f" Created Courier: {courier_email}"))
         else:
             if courier_user.role != "COURIER":
@@ -87,9 +93,9 @@ class Command(BaseCommand):
                 "cuisine": "Italian",
                 "description": "Hand-stretched pizzas, sides, and desserts.",
                 "image_url": _image_url("pizza-paradise", 800, 500),
-                "address": "101 Main Street, New York, NY",
-                "latitude": Decimal("40.712776"),
-                "longitude": Decimal("-74.005974"),
+                "address": "15 Soborna St, Rivne, Rivne Oblast",
+                "latitude": Decimal("50.619900"),
+                "longitude": Decimal("26.251617"),
                 "rating": Decimal("4.70"),
                 "delivery_time": 30,
                 "items": {
@@ -120,9 +126,9 @@ class Command(BaseCommand):
                 "cuisine": "American",
                 "description": "Classic burgers, fries, and milkshakes.",
                 "image_url": _image_url("burger-joint", 800, 500),
-                "address": "202 Market Street, Chicago, IL",
-                "latitude": Decimal("41.878113"),
-                "longitude": Decimal("-87.629799"),
+                "address": "22 Kyivska St, Rivne, Rivne Oblast",
+                "latitude": Decimal("50.618143"),
+                "longitude": Decimal("26.258832"),
                 "rating": Decimal("4.50"),
                 "delivery_time": 25,
                 "items": {
@@ -152,9 +158,9 @@ class Command(BaseCommand):
                 "cuisine": "Japanese",
                 "description": "Fresh sushi rolls, nigiri, and Japanese snacks.",
                 "image_url": _image_url("sushi-world", 800, 500),
-                "address": "303 Harbor Road, San Francisco, CA",
-                "latitude": Decimal("37.774929"),
-                "longitude": Decimal("-122.419418"),
+                "address": "10 16-го Lypnia St, Rivne, Rivne Oblast",
+                "latitude": Decimal("50.617197"),
+                "longitude": Decimal("26.252030"),
                 "rating": Decimal("4.90"),
                 "delivery_time": 35,
                 "items": {
