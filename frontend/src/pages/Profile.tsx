@@ -1,13 +1,14 @@
 import type { FC } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { SectionContainer, Card, Badge } from '../components/common';
+import ChangePasswordForm from '../features/auth/components/ChangePasswordForm';
 
 const Profile: FC = () => {
   const { profile } = useAuth();
 
   return (
     <SectionContainer width="content" padding="lg" className="flex min-h-[70vh] items-center justify-center">
-      <Card elevation="elevated" padding="lg" className="w-full max-w-lg space-y-6">
+      <Card elevation="elevated" padding="lg" className="w-full max-w-3xl space-y-8">
         <div>
           <div className="mb-2">
             <Badge variant="success" size="sm">
@@ -30,6 +31,8 @@ const Profile: FC = () => {
             <dd className="mt-1 font-semibold text-text-primary">{profile?.address || 'Not provided'}</dd>
           </div>
         </dl>
+
+        <ChangePasswordForm />
       </Card>
     </SectionContainer>
   );

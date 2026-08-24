@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
-import type { FC, KeyboardEvent, ClipboardEvent, ChangeEvent } from 'react';
+import { useState, useEffect } from 'react';
+import type { FC } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { authApi } from '../api/authApi';
 import { getAuthError } from '../utils/getAuthError';
 import { triggerMonochromeConfetti } from '../../../utils/confetti';
 import { Card, Button, Alert } from '../../../components/common';
+import OtpInput from './OtpInput';
 
 export const VerificationForm: FC = () => {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export const VerificationForm: FC = () => {
     return sessionEmail || '';
   });
   
-  const [code, setCode] = useState<string[]>(Array(6).fill(''));
+  const [code, setCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState('');
@@ -55,8 +56,6 @@ export const VerificationForm: FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
   // Cooldown interval
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -70,7 +69,7 @@ export const VerificationForm: FC = () => {
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [cooldown]);
+  }, [cooldown, email]);
 
   const handleVerify = async (submissionCode: string) => {
     if (submissionCode.length !== 6 || isVerifying || isVerified) return;
@@ -95,10 +94,7 @@ export const VerificationForm: FC = () => {
       setError(getAuthError(err, 'Verification failed. Please try again.'));
       setIsVerifying(false);
       // Auto-focus first input on error
-      if (inputRefs.current[0]) {
-        inputRefs.current[0].focus();
-        inputRefs.current[0].select();
-      }
+      document.querySelector<HTMLInputElement>('[aria-label="Verification code digit 1"]')?.focus();
     }
   };
 
@@ -135,81 +131,20 @@ export const VerificationForm: FC = () => {
     if (location.state?.autoResend && email) {
       // Clear autoResend to prevent double-firing
       navigate(location.pathname, { replace: true, state: { ...location.state, autoResend: false } });
-      if (cooldown === 0 && !isResending) {
+      const autoResendKey = `verification_auto_resend_${email}`;
+      const lastAutoResend = Number(sessionStorage.getItem(autoResendKey) ?? 0);
+      const wasJustRequested = Date.now() - lastAutoResend < 5000;
+
+      if (cooldown === 0 && !isResending && !wasJustRequested) {
+        // Persisted synchronously so React StrictMode remounts cannot issue a
+        // second request before the first response starts the normal cooldown.
+        sessionStorage.setItem(autoResendKey, Date.now().toString());
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         void handleResend();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state?.autoResend, email]);
-
-  const handleChange = (index: number, e: ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, ''); // only digits
-    if (!value) return;
-
-    setError(''); // clear error immediately on typing
-    const newCode = [...code];
-    newCode[index] = value.substring(value.length - 1);
-    setCode(newCode);
-
-    // Auto-advance
-    if (index < 5 && value) {
-      inputRefs.current[index + 1]?.focus();
-    } else if (index === 5 && value) {
-      // Small delay before verify to allow the UI to paint the last character
-      setTimeout(() => {
-        void handleVerify(newCode.join(''));
-      }, 300);
-    }
-  };
-
-  const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
-      setError('');
-      const newCode = [...code];
-      if (code[index]) {
-        newCode[index] = '';
-        setCode(newCode);
-      } else if (index > 0) {
-        newCode[index - 1] = '';
-        setCode(newCode);
-        inputRefs.current[index - 1]?.focus();
-      }
-    } else if (e.key === 'ArrowLeft' && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    } else if (e.key === 'ArrowRight' && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    } else if (e.key === 'Enter') {
-      const completeCode = code.join('');
-      if (completeCode.length === 6) {
-        void handleVerify(completeCode);
-      }
-    }
-  };
-
-  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, ''); // keep only digits
-    if (!pasted) return;
-
-    setError('');
-    const newCode = [...code];
-    for (let i = 0; i < 6; i++) {
-      if (i < pasted.length) {
-        newCode[i] = pasted[i];
-      }
-    }
-    setCode(newCode);
-
-    // Focus appropriate box
-    const focusIndex = Math.min(pasted.length, 5);
-    inputRefs.current[focusIndex]?.focus();
-    
-    if (pasted.length >= 6) {
-      setTimeout(() => {
-        void handleVerify(newCode.join(''));
-      }, 300);
-    }
-  };
 
   if (!email && !location.state?.email && !sessionStorage.getItem('verification_email')) {
     return (
@@ -265,29 +200,14 @@ export const VerificationForm: FC = () => {
       </div>
 
       <div className="space-y-8">
-        <div 
-          className="flex justify-between gap-3"
-          role="group"
-          aria-label="One-time password input"
-        >
-          {code.map((digit, index) => (
-            <input
-              key={index}
-              ref={(el) => { inputRefs.current[index] = el; }}
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={1}
-              value={digit}
-              onChange={(e) => handleChange(index, e)}
-              onKeyDown={(e) => handleKeyDown(index, e)}
-              onPaste={handlePaste}
-              disabled={isVerifying || isVerified}
-              aria-label={`Digit ${index + 1}`}
-              className="aspect-square w-full min-w-0 flex-1 rounded-none border border-border-default bg-surface text-center text-2xl font-serif text-text-primary shadow-subtle transition-base focus:border-text-primary focus:outline-none disabled:opacity-50"
-            />
-          ))}
-        </div>
+        <OtpInput
+          value={code}
+          onChange={(value) => { setCode(value); setError(''); }}
+          onComplete={(value) => window.setTimeout(() => void handleVerify(value), 300)}
+          disabled={isVerifying || isVerified}
+          error={Boolean(error)}
+          autoFocus
+        />
 
         {error && <Alert variant="error" message={error} />}
         {success && !isVerified && <Alert variant="success" message={success} />}
@@ -299,8 +219,8 @@ export const VerificationForm: FC = () => {
             size="lg"
             fullWidth
             isLoading={isVerifying}
-            disabled={code.join('').length !== 6 || isVerified}
-            onClick={() => void handleVerify(code.join(''))}
+            disabled={code.length !== 6 || isVerified}
+            onClick={() => void handleVerify(code)}
           >
             Verify
           </Button>
