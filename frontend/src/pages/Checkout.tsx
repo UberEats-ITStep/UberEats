@@ -53,7 +53,9 @@ const Checkout: FC = () => {
     try {
       setIsSubmitting(true);
       setError(null);
-      await orderService.checkout(address);
+      // Using test coordinates for Rivne MVP:
+      // In a real app, this would come from a map picker or the user's profile
+      await orderService.checkout(address, "50.620000", "26.250000");
       
       await refreshCart();
       

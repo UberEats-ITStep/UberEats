@@ -23,7 +23,7 @@ export function useEligibleReviewOrder(
         
         // Find completed orders for this restaurant
         const completedOrders = orderHistory.filter(
-          order => order.restaurant === restaurantId && ((order.status as string).toUpperCase() === 'COMPLETED' || order.status === 'Completed')
+          order => order.restaurant === restaurantId && order.status === 'COMPLETED'
         );
 
         // Sort to get the newest first (assuming higher ID or created_at string comparison)

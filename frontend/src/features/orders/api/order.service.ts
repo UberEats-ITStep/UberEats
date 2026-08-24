@@ -22,8 +22,12 @@ export const orderService = {
         return response.data;
     },
     
-    async checkout(delivery_address: string): Promise<Order> {
-        const response = await apiClient.post<Order>('/orders/checkout/', { delivery_address });
+    async checkout(delivery_address: string, delivery_latitude?: string, delivery_longitude?: string): Promise<Order> {
+        const response = await apiClient.post<Order>('/orders/checkout/', { 
+            delivery_address, 
+            delivery_latitude, 
+            delivery_longitude 
+        });
         return response.data;
     },
 };

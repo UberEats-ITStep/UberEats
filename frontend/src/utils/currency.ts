@@ -1,6 +1,6 @@
-const priceFormatter = new Intl.NumberFormat('en-US', {
+const priceFormatter = new Intl.NumberFormat('uk-UA', {
   style: 'currency',
-  currency: 'USD',
+  currency: 'UAH',
 });
 
 export const formatPrice = (price: string | number): string => {
