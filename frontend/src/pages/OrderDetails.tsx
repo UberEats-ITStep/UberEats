@@ -58,8 +58,21 @@ const OrderDetails: FC = () => {
           <Card padding="lg" className="rounded-none">
             <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">Delivery</h2>
             <p className="mt-4 text-lg text-text-primary">
-              {order.delivery_address || 'No delivery address was provided.'}
+              {(
+                (order.street && order.building && `${order.street}, ${order.building}`) ||
+                (order.street && `${order.street}`) ||
+                'No delivery address was provided.'
+              )}
             </p>
+            { (order.apartment || order.entrance || order.floor || order.delivery_notes || order.contact_phone) && (
+              <div className="mt-3 text-sm text-text-secondary space-y-1">
+                {order.apartment && <div>Apartment: {order.apartment}</div>}
+                {order.entrance && <div>Entrance: {order.entrance}</div>}
+                {order.floor != null && <div>Floor: {order.floor}</div>}
+                {order.delivery_notes && <div>Notes: {order.delivery_notes}</div>}
+                {order.contact_phone && <div>Phone: {order.contact_phone}</div>}
+              </div>
+            )}
             {order.restaurant && (
               <Link
                 to={`/restaurants/${order.restaurant}`}

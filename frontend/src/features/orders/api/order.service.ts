@@ -22,8 +22,16 @@ export const orderService = {
         return response.data;
     },
     
-    async checkout(delivery_address: string): Promise<Order> {
-        const response = await apiClient.post<Order>('/orders/checkout/', { delivery_address });
+    async checkout(payload: {
+        street: string;
+        building: string;
+        apartment?: string;
+        entrance?: string;
+        floor?: number | null;
+        delivery_notes?: string;
+        contact_phone?: string;
+    }): Promise<Order> {
+        const response = await apiClient.post<Order>('/orders/checkout/', payload);
         return response.data;
     },
 };

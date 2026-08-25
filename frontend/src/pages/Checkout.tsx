@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../hooks/useAuth';
 import { orderService } from '../features/orders/api/order.service';
-import { Button, Input, SectionContainer, EmptyState, Alert, Card, FormField } from '../components/common';
+import { Button, Input, Textarea, SectionContainer, EmptyState, Alert, Card, FormField } from '../components/common';
 import OrderSummaryList, { type SummaryItem } from '../features/orders/components/OrderSummaryList';
 import OrderPlacementAnimation from '../features/orders/components/OrderPlacementAnimation';
 import { formatPrice } from '../utils/currency';
@@ -14,9 +14,17 @@ const Checkout: FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
 
-  const [address, setAddress] = useState(profile?.address || '');
+  const [street, setStreet] = useState(profile?.address || '');
+  const [building, setBuilding] = useState('');
+  const [apartment, setApartment] = useState('');
+  const [entrance, setEntrance] = useState('');
+  const [floor, setFloor] = useState<number | ''>('');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [contactPhone, setContactPhone] = useState(profile?.phone_number || '');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showSuccess, setShowSuccess] = useState(false);
 
   if (isSubmitting || showSuccess) {
@@ -45,15 +53,28 @@ const Checkout: FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!address.trim()) {
-      setError('Please provide a delivery address.');
+    const errors: Record<string, string> = {};
+    if (!street.trim()) errors.street = 'Street is required.';
+    if (!building.trim()) errors.building = 'Building / house number is required.';
+
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors);
       return;
     }
 
     try {
       setIsSubmitting(true);
       setError(null);
-      await orderService.checkout(address);
+      setFieldErrors({});
+      await orderService.checkout({
+        street: street.trim(),
+        building: building.trim(),
+        apartment: apartment.trim(),
+        entrance: entrance.trim(),
+        floor: floor === '' ? null : Number(floor),
+        delivery_notes: deliveryNotes.trim(),
+        contact_phone: contactPhone.trim(),
+      });
       
       await refreshCart();
       
@@ -62,8 +83,25 @@ const Checkout: FC = () => {
         navigate('/orders', { state: { successMessage: 'Order placed successfully!' } });
       }, 1500);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { non_field_errors?: string[] } } };
-      setError(error.response?.data?.non_field_errors?.[0] || 'Failed to place order. Please try again.');
+      const httpErr = err as { response?: { data?: any } };
+      const data = httpErr.response?.data;
+
+      if (data) {
+        const newFieldErrors: Record<string, string> = {};
+        for (const key of Object.keys(data)) {
+          if (Array.isArray(data[key]) && data[key].length) {
+            if (key === 'non_field_errors') {
+              setError(data[key][0]);
+            } else {
+              newFieldErrors[key] = data[key][0];
+            }
+          }
+        }
+        setFieldErrors(newFieldErrors);
+      } else {
+        setError('Failed to place order. Please try again.');
+      }
+
       setIsSubmitting(false);
     }
   };
@@ -99,15 +137,50 @@ const Checkout: FC = () => {
             )}
 
             <form id="checkout-form" onSubmit={handleSubmit} className="space-y-6">
-              <FormField label="Delivery Address" id="address" required>
-                <Input
-                  id="address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="123 Main St, Apt 4B"
-                  required
-                />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <FormField label="Street" id="street" required error={fieldErrors.street}>
+                  <Input
+                    id="street"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    placeholder="Soborna Street"
+                    required
+                  />
+                </FormField>
+
+                <FormField label="Building / House #" id="building" required error={fieldErrors.building}>
+                  <Input
+                    id="building"
+                    value={building}
+                    onChange={(e) => setBuilding(e.target.value)}
+                    placeholder="15A"
+                    required
+                  />
+                </FormField>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <FormField label="Apartment" id="apartment" optionalLabel>
+                  <Input id="apartment" value={apartment} onChange={(e) => setApartment(e.target.value)} placeholder="42" />
+                </FormField>
+
+                <FormField label="Entrance" id="entrance" optionalLabel>
+                  <Input id="entrance" value={entrance} onChange={(e) => setEntrance(e.target.value)} placeholder="2" />
+                </FormField>
+
+                <FormField label="Floor" id="floor" optionalLabel>
+                  <Input id="floor" type="number" value={floor === '' ? '' : String(floor)} onChange={(e) => setFloor(e.target.value === '' ? '' : Number(e.target.value))} placeholder="5" />
+                </FormField>
+              </div>
+
+              <FormField label="Delivery Notes" id="delivery_notes" optionalLabel helperText="Max 500 characters" error={fieldErrors.delivery_notes}>
+                <Textarea id="delivery_notes" value={deliveryNotes} onChange={(e) => setDeliveryNotes(e.target.value)} rows={4} placeholder="Please call when you arrive." />
               </FormField>
+
+              <FormField label="Contact Phone" id="contact_phone" optionalLabel error={fieldErrors.contact_phone}>
+                <Input id="contact_phone" type="tel" inputMode="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+380501234567" />
+              </FormField>
+
             </form>
           </Card>
 

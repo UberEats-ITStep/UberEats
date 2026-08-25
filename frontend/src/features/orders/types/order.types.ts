@@ -20,7 +20,13 @@ export interface Order {
     status: OrderStatus;
     total_price: string;
     created_at: string;
-    delivery_address: string;
+    street?: string;
+    building?: string;
+    apartment?: string;
+    entrance?: string;
+    floor?: number | null;
+    delivery_notes?: string;
+    contact_phone?: string;
     restaurant: number | null; // Backend returns the ID
     restaurant_name?: string;
     items: OrderItem[];
