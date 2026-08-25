@@ -50,7 +50,17 @@ class Order(models.Model):
         decimal_places=2,
         default=0,
     )
-    delivery_address = models.TextField(blank=True)
+
+    street = models.CharField(max_length=255)
+    building = models.CharField(max_length=20)
+
+    apartment = models.CharField(max_length=20, blank=True, default='')
+    entrance = models.CharField(max_length=20, blank=True, default='')
+    floor = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    delivery_notes = models.TextField(max_length=500, blank=True, default='')
+    contact_phone = models.CharField(max_length=20, blank=True, default='')
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
