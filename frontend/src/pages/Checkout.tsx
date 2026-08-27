@@ -74,6 +74,8 @@ const Checkout: FC = () => {
         floor: floor === '' ? null : Number(floor),
         delivery_notes: deliveryNotes.trim(),
         contact_phone: contactPhone.trim(),
+        delivery_latitude: "50.620000",
+        delivery_longitude: "26.250000"
       });
       
       await refreshCart();
@@ -83,7 +85,7 @@ const Checkout: FC = () => {
         navigate('/orders', { state: { successMessage: 'Order placed successfully!' } });
       }, 1500);
     } catch (err: unknown) {
-      const httpErr = err as { response?: { data?: any } };
+      const httpErr = err as { response?: { data?: Record<string, string[]> } };
       const data = httpErr.response?.data;
 
       if (data) {

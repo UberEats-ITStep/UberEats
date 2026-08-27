@@ -30,6 +30,8 @@ export const orderService = {
         floor?: number | null;
         delivery_notes?: string;
         contact_phone?: string;
+        delivery_latitude?: string;
+        delivery_longitude?: string;
     }): Promise<Order> {
         const response = await apiClient.post<Order>('/orders/checkout/', payload);
         return response.data;
