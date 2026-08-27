@@ -1,10 +1,11 @@
 export type OrderStatus =
-    | 'Pending'
-    | 'Preparing'
-    | 'Ready'
-    | 'Delivering'
-    | 'Completed'
-    | 'Cancelled';
+    | 'PENDING'
+    | 'ACCEPTED'
+    | 'PREPARING'
+    | 'READY'
+    | 'DELIVERING'
+    | 'COMPLETED'
+    | 'CANCELLED';
 
 export interface OrderItem {
     id: number;
@@ -27,7 +28,11 @@ export interface Order {
     floor?: number | null;
     delivery_notes?: string;
     contact_phone?: string;
+    delivery_latitude?: string | null;
+    delivery_longitude?: string | null;
     restaurant: number | null; // Backend returns the ID
     restaurant_name?: string;
+    restaurant_latitude?: string | null;
+    restaurant_longitude?: string | null;
     items: OrderItem[];
 }

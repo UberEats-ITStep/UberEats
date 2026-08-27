@@ -3,13 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import { Alert, Card, LoadingState, SectionContainer } from '../components/common';
 import OrderItemsList from '../features/orders/components/OrderItemsList';
 import OrderStatusBadge from '../features/orders/components/OrderStatusBadge';
-import { useOrderDetails } from '../features/orders/hooks/useOrderDetails';
+import OrderTracker from '../features/orders/components/OrderTracker';
+import { useOrderTracking } from '../features/orders/hooks/useOrderTracking';
 import { formatOrderDate } from '../features/orders/utils/order.utils';
 import { formatPrice } from '../utils/currency';
 
 const OrderDetails: FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
-  const { order, isLoading, error, reload } = useOrderDetails(orderId);
+  const { order, isLoading, error, backgroundError, reload } = useOrderTracking(orderId);
 
   if (isLoading) {
     return <LoadingState message="Loading order details..." />;
@@ -22,7 +23,7 @@ const OrderDetails: FC = () => {
           variant="error"
           title="Order unavailable"
           message={error ?? 'This order is not available.'}
-          onRetry={orderId ? reload : undefined}
+          onRetry={orderId ? () => reload() : undefined}
         />
         <Link to="/orders" className="mt-6 inline-block text-sm font-medium underline underline-offset-4">
           Back to your orders
@@ -37,7 +38,7 @@ const OrderDetails: FC = () => {
         ← Back to your orders
       </Link>
 
-      <header className="mb-8 flex flex-col gap-5 border-b border-text-primary pb-6 sm:flex-row sm:items-end sm:justify-between">
+      <header className="mb-8 flex flex-col gap-5 border-b border-border-default pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="mb-2 text-sm uppercase tracking-widest text-text-muted">Order #{order.id}</p>
           <h1 className="font-serif text-4xl italic text-text-primary sm:text-5xl">
@@ -47,6 +48,14 @@ const OrderDetails: FC = () => {
         </div>
         <OrderStatusBadge status={order.status} />
       </header>
+
+      {backgroundError && (
+        <div className="mb-8 rounded-none border border-warning bg-warning/10 p-3 text-sm text-warning">
+          {backgroundError}
+        </div>
+      )}
+
+      <OrderTracker order={order} />
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <Card padding="lg" className="rounded-none">

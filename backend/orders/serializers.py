@@ -21,6 +21,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     restaurant_name = serializers.CharField(source='restaurant.name', read_only=True)
+    restaurant_latitude = serializers.DecimalField(source='restaurant.latitude', max_digits=9, decimal_places=6, read_only=True)
+    restaurant_longitude = serializers.DecimalField(source='restaurant.longitude', max_digits=9, decimal_places=6, read_only=True)
 
     class Meta:
         model = Order
@@ -35,10 +37,14 @@ class OrderSerializer(serializers.ModelSerializer):
             'floor',
             'delivery_notes',
             'contact_phone',
+            'delivery_latitude',
+            'delivery_longitude',
             'created_at',
             'items',
             'restaurant',
             'restaurant_name',
+            'restaurant_latitude',
+            'restaurant_longitude',
             'courier',
         ]
 
@@ -46,6 +52,9 @@ class OrderSerializer(serializers.ModelSerializer):
 class CheckoutSerializer(serializers.Serializer):
     street = serializers.CharField(max_length=255)
     building = serializers.CharField(max_length=20)
+    
+    delivery_latitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    delivery_longitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
 
     apartment = serializers.CharField(
         max_length=20,
@@ -108,6 +117,14 @@ class CheckoutSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
+        lat = attrs.get('delivery_latitude')
+        lng = attrs.get('delivery_longitude')
+        if (lat is None) != (lng is None):
+            missing_field = 'delivery_longitude' if lng is None else 'delivery_latitude'
+            raise serializers.ValidationError({
+                missing_field: 'Delivery latitude and longitude must both be set, or both be empty.'
+            })
+
         user = self.context['request'].user
 
         if not hasattr(user, 'cart') or not user.cart.items.exists():
@@ -144,7 +161,6 @@ class CheckoutSerializer(serializers.Serializer):
         order = Order.objects.create(
             client=user,
             restaurant=restaurant,
-
             street=validated_data['street'],
             building=validated_data['building'],
             apartment=validated_data.get('apartment', ''),
@@ -152,6 +168,8 @@ class CheckoutSerializer(serializers.Serializer):
             floor=validated_data.get('floor'),
             delivery_notes=validated_data.get('delivery_notes', ''),
             contact_phone=validated_data.get('contact_phone', ''),
+            delivery_latitude=validated_data.get('delivery_latitude'),
+            delivery_longitude=validated_data.get('delivery_longitude'),
         )
 
         total_price = 0

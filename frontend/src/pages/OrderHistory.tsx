@@ -72,31 +72,37 @@ const OrderHistory: FC = () => {
         };
 
         void loadInitialOrders();
-
         return () => controller.abort();
     }, []);
 
     // Polling effect for active orders
     useEffect(() => {
-        const hasActiveOrders = orders.some(o => 
-            o.status !== 'Completed' && 
-            o.status !== 'Cancelled' && 
-            (o.status as string).toUpperCase() !== 'COMPLETED' && 
-            (o.status as string).toUpperCase() !== 'CANCELLED'
-        );
+        const hasActiveOrders = orders.some((o) => {
+          const isActive =
+            o.status !== 'COMPLETED' &&
+            o.status !== 'CANCELLED';
+          return isActive;
+        });
 
         if (!hasActiveOrders) return;
 
-        const intervalId = setInterval(() => {
+        const intervalId = window.setInterval(() => {
             void loadOrders(true);
         }, 10000);
 
-        return () => clearInterval(intervalId);
+        return () => window.clearInterval(intervalId);
     }, [orders, loadOrders]);
+
+    const activeOrders = orders.filter(
+        (o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED'
+    );
+    const pastOrders = orders.filter(
+        (o) => o.status === 'COMPLETED' || o.status === 'CANCELLED'
+    );
 
     return (
         <SectionContainer width="content" padding="lg" className="pb-16 pt-10">
-            <div className="mb-12 border-b border-text-primary pb-6">
+            <div className="mb-12 border-b border-border-default pb-6">
                 <p className="text-sm tracking-widest uppercase text-text-muted mb-2">History</p>
                 <h1 className="text-5xl font-serif italic text-text-primary">Your Orders</h1>
             </div>
@@ -131,10 +137,36 @@ const OrderHistory: FC = () => {
                     }
                 />
             ) : (
-                <div className="space-y-8">
-                    {orders.map((order) => (
-                        <OrderCard key={order.id} order={order} />
-                    ))}
+                <div className="space-y-16">
+                    {activeOrders.length > 0 && (
+                        <div>
+                            <h2 className="text-sm tracking-widest uppercase text-text-primary font-bold mb-6 flex items-center gap-2">
+                                <span className="relative flex h-2.5 w-2.5">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-text-primary opacity-40"></span>
+                                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-text-primary"></span>
+                                </span>
+                                Active Orders
+                            </h2>
+                            <div className="space-y-8">
+                                {activeOrders.map((order) => (
+                                    <OrderCard key={order.id} order={order} isActive />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {pastOrders.length > 0 && (
+                        <div>
+                            <h2 className="text-sm tracking-widest uppercase text-text-muted mb-6">
+                                Past Orders
+                            </h2>
+                            <div className="space-y-6">
+                                {pastOrders.map((order) => (
+                                    <OrderCard key={order.id} order={order} isActive={false} />
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </SectionContainer>
