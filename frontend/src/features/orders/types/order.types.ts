@@ -21,7 +21,13 @@ export interface Order {
     status: OrderStatus;
     total_price: string;
     created_at: string;
-    delivery_address: string;
+    street?: string;
+    building?: string;
+    apartment?: string;
+    entrance?: string;
+    floor?: number | null;
+    delivery_notes?: string;
+    contact_phone?: string;
     delivery_latitude?: string | null;
     delivery_longitude?: string | null;
     restaurant: number | null; // Backend returns the ID

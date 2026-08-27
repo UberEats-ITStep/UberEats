@@ -1,11 +1,10 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import type { Order } from '../types/order.types';
 import Map, { Source, Layer, Marker, NavigationControl } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useCourierSimulation } from '../hooks/useCourierSimulation';
-import { LIFECYCLE_STEPS, getActiveStepIndex } from '../utils/order.utils';
 
 interface OrderLiveMapProps {
   order: Order;
@@ -13,49 +12,57 @@ interface OrderLiveMapProps {
 
 const OrderLiveMap: FC<OrderLiveMapProps> = ({ order }) => {
   const maptilerKey = import.meta.env.VITE_MAPTILER_API_KEY;
-  const isDelivering = order.status === 'DELIVERING';
   const mapRef = useRef<MapRef>(null);
 
   const {
     courierPosition,
-    routeGeoJSON,
+    routeA,
+    routeB,
     startPoint,
     endPoint,
+    courierStage
   } = useCourierSimulation({
     order,
-    isActive: isDelivering,
-    maptilerKey
+    isActive: true
   });
 
+  // Center the map so it frames the active stage
   useEffect(() => {
-    if (mapRef.current && startPoint && endPoint) {
-      const minLng = Math.min(startPoint[0], endPoint[0]);
-      const maxLng = Math.max(startPoint[0], endPoint[0]);
-      const minLat = Math.min(startPoint[1], endPoint[1]);
-      const maxLat = Math.max(startPoint[1], endPoint[1]);
-      
-      const lngDiff = maxLng - minLng;
-      const latDiff = maxLat - minLat;
-      
-      // If points are identical, just center without fitBounds
-      if (lngDiff === 0 && latDiff === 0) {
-        mapRef.current.flyTo({ center: startPoint, zoom: 15 });
-        return;
-      }
-      
+    if (!mapRef.current || !startPoint || !endPoint) return;
+    
+    // Fit bounds based on which stage we are in
+    const activeRoute = (courierStage === 'TO_CUSTOMER' || courierStage === 'ARRIVED') ? routeB : routeA;
+    if (!activeRoute) return;
+
+    const coords = activeRoute.geometry.coordinates;
+    if (!coords || coords.length === 0) return;
+
+    let minLng = coords[0][0];
+    let maxLng = coords[0][0];
+    let minLat = coords[0][1];
+    let maxLat = coords[0][1];
+
+    for (const [lng, lat] of coords) {
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    }
+
+    try {
       mapRef.current.fitBounds(
         [[minLng, minLat], [maxLng, maxLat]],
         { padding: 80, duration: 1500, maxZoom: 15 }
       );
+    } catch (e) {
+      console.warn('Map fitBounds failed:', e);
     }
-  }, [startPoint, endPoint]);
+  }, [courierStage, routeA, routeB, startPoint, endPoint]);
 
   if (!startPoint || !endPoint) {
     return null; // Silent fallback if no coordinates
   }
 
-  // Use basic-v2 as it's the most reliable standard MapTiler style, 
-  // or fallback to OSM with corrected contrast so it doesn't look like a gray blob.
   const mapStyle = maptilerKey 
     ? `https://api.maptiler.com/maps/basic-v2/style.json?key=${maptilerKey}`
     : {
@@ -81,96 +88,124 @@ const OrderLiveMap: FC<OrderLiveMapProps> = ({ order }) => {
         ]
       } as any;
 
-  const viewState = useMemo(() => {
-    return {
-      longitude: (startPoint[0] + endPoint[0]) / 2,
-      latitude: (startPoint[1] + endPoint[1]) / 2,
-      zoom: 13,
-      pitch: 45
-    };
-  }, [startPoint, endPoint]);
+  // Determine Overlay content
+  let overlayTitle = "PREPARING";
+  let overlayDescription = "Order is being packed";
 
-  const activeIndex = getActiveStepIndex(order.status);
-  const activeStep = LIFECYCLE_STEPS[activeIndex];
+  if (courierStage === 'PREPARING') {
+    if (order.status === 'PENDING') {
+      overlayTitle = "ORDER PLACED";
+      overlayDescription = "Waiting for restaurant confirmation";
+    } else if (order.status === 'ACCEPTED') {
+      overlayTitle = "ACCEPTED";
+      overlayDescription = "Getting ready to prepare";
+    } else {
+      overlayTitle = "PREPARING";
+      overlayDescription = "The kitchen is working on your order";
+    }
+  } else if (courierStage === 'TO_RESTAURANT') {
+    overlayTitle = "PICKUP IN PROGRESS";
+    overlayDescription = "Courier is heading to the restaurant";
+  } else if (courierStage === 'AT_RESTAURANT') {
+    overlayTitle = "AT RESTAURANT";
+    overlayDescription = "Courier is picking up your order";
+  } else if (courierStage === 'TO_CUSTOMER') {
+    overlayTitle = "OUT FOR DELIVERY";
+    overlayDescription = "Your courier is on the way";
+  } else if (courierStage === 'ARRIVED') {
+    overlayTitle = "DELIVERED";
+    overlayDescription = "Enjoy your meal!";
+  } else if (courierStage === 'CANCELLED') {
+    overlayTitle = "CANCELLED";
+    overlayDescription = "Order was cancelled";
+  }
+
+  const isStageA = courierStage === 'TO_RESTAURANT' || courierStage === 'AT_RESTAURANT' || courierStage === 'PREPARING';
 
   return (
     <div className="relative w-full h-[500px] sm:h-[600px] bg-background overflow-hidden border-y border-border-default">
-      {/* Editorial Map Overlay elements */}
-      <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-surface/80 to-transparent z-10 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-surface/80 to-transparent z-10 pointer-events-none" />
       
-      {/* Floating Status Card */}
-      <div className="absolute top-6 left-6 z-20 bg-surface border border-border-default shadow-elevated p-4 max-w-[250px]">
-        <p className="text-[10px] uppercase font-bold tracking-widest text-text-muted mb-1">
-          Live Tracking
-        </p>
-        <p className="text-sm font-medium text-text-primary">
-          {activeStep?.title || order.status}
-        </p>
+      {/* Map Status Overlay */}
+      <div className="absolute top-6 left-6 z-20 max-w-[280px]">
+        <div className="bg-surface shadow-elevated border border-border-default p-5 transition-all">
+          <h3 className="font-bold text-text-primary text-sm uppercase tracking-widest mb-1">
+            {overlayTitle}
+          </h3>
+          <p className="text-sm text-text-secondary">
+            {overlayDescription}
+          </p>
+        </div>
       </div>
 
       <Map
         ref={mapRef}
-        initialViewState={viewState}
+        initialViewState={{
+          longitude: startPoint[0],
+          latitude: startPoint[1],
+          zoom: 13
+        }}
         mapStyle={mapStyle}
         attributionControl={false}
       >
         <NavigationControl position="bottom-right" />
-        
-        {/* Route Line */}
-        {routeGeoJSON && (
-          <>
-            <Source id="route-bg" type="geojson" data={routeGeoJSON}>
-              <Layer 
-                id="route-line-bg" 
-                type="line" 
-                paint={{
-                  'line-color': '#FFFFFF',
-                  'line-width': 8,
-                  'line-opacity': 0.8
-                }} 
-              />
-            </Source>
-            <Source id="route" type="geojson" data={routeGeoJSON}>
-              <Layer 
-                id="route-line" 
-                type="line" 
-                paint={{
-                  'line-color': '#191918',
-                  'line-width': 3,
-                  'line-dasharray': [2, 2],
-                  'line-opacity': 0.8
-                }} 
-              />
-            </Source>
-          </>
+
+        {/* Route A (Courier -> Restaurant) */}
+        {routeA && (
+          <Source id="route-a" type="geojson" data={routeA}>
+            <Layer 
+              id="line-a" 
+              type="line" 
+              paint={{
+                'line-color': isStageA ? '#191918' : '#9ca3af',
+                'line-width': isStageA ? 3 : 2,
+                'line-dasharray': [2, 2],
+                'line-opacity': isStageA ? 1 : 0.4
+              }} 
+            />
+          </Source>
+        )}
+
+        {/* Route B (Restaurant -> Customer) */}
+        {routeB && (
+          <Source id="route-b" type="geojson" data={routeB}>
+            <Layer 
+              id="line-b" 
+              type="line" 
+              paint={{
+                'line-color': !isStageA ? '#191918' : '#9ca3af',
+                'line-width': !isStageA ? 3 : 2,
+                'line-dasharray': [2, 2],
+                'line-opacity': !isStageA ? 1 : 0.4
+              }} 
+            />
+          </Source>
         )}
 
         {/* Restaurant Marker */}
-        <Marker longitude={startPoint[0]} latitude={startPoint[1]} anchor="bottom">
-          <div className="flex flex-col items-center">
-            <div className="bg-surface border border-border-default text-text-primary px-3 py-1 text-[10px] uppercase font-bold tracking-widest shadow-subtle mb-1 whitespace-nowrap">
-              Restaurant
+        <Marker longitude={startPoint[0]} latitude={startPoint[1]} anchor="center">
+          <div className="relative flex justify-center items-center">
+            <div className="absolute bottom-full mb-1 bg-surface border border-border-default text-text-primary px-3 py-1 text-[10px] uppercase font-bold tracking-widest shadow-subtle whitespace-nowrap">
+              ● RESTAURANT
             </div>
             <div className="h-4 w-4 bg-surface border-4 border-text-primary rounded-full shadow-subtle" />
           </div>
         </Marker>
 
         {/* Destination Marker */}
-        <Marker longitude={endPoint[0]} latitude={endPoint[1]} anchor="bottom">
-          <div className="flex flex-col items-center">
-            <div className="bg-text-primary text-surface px-3 py-1 text-[10px] uppercase font-bold tracking-widest shadow-subtle mb-1 whitespace-nowrap">
-              Destination
+        <Marker longitude={endPoint[0]} latitude={endPoint[1]} anchor="center">
+          <div className="relative flex justify-center items-center">
+            <div className="absolute bottom-full mb-1 bg-text-primary text-surface px-3 py-1 text-[10px] uppercase font-bold tracking-widest shadow-subtle whitespace-nowrap">
+              ● YOU
             </div>
             <div className="h-3 w-3 bg-text-primary rounded-full shadow-subtle" />
           </div>
         </Marker>
 
         {/* Courier Marker */}
-        {courierPosition && (
+        {courierPosition && courierStage !== 'CANCELLED' && (
           <Marker longitude={courierPosition[0]} latitude={courierPosition[1]} anchor="center">
             <div className="relative flex items-center justify-center">
-              {isDelivering && (
+              {courierStage === 'TO_CUSTOMER' && (
                 <div className="absolute w-16 h-16 border-2 border-text-primary rounded-full animate-ping opacity-20" />
               )}
               <div className="relative z-10 w-10 h-10 bg-text-primary text-surface rounded-full flex items-center justify-center shadow-floating transition-transform duration-300">

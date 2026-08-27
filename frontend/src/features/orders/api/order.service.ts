@@ -22,12 +22,18 @@ export const orderService = {
         return response.data;
     },
     
-    async checkout(delivery_address: string, delivery_latitude?: string, delivery_longitude?: string): Promise<Order> {
-        const response = await apiClient.post<Order>('/orders/checkout/', { 
-            delivery_address, 
-            delivery_latitude, 
-            delivery_longitude 
-        });
+    async checkout(payload: {
+        street: string;
+        building: string;
+        apartment?: string;
+        entrance?: string;
+        floor?: number | null;
+        delivery_notes?: string;
+        contact_phone?: string;
+        delivery_latitude?: string;
+        delivery_longitude?: string;
+    }): Promise<Order> {
+        const response = await apiClient.post<Order>('/orders/checkout/', payload);
         return response.data;
     },
 };

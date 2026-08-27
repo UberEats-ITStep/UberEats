@@ -1,142 +1,184 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Order } from '../types/order.types';
 import * as turf from '@turf/helpers';
 import length from '@turf/length';
 import along from '@turf/along';
+import destination from '@turf/destination';
+
+export type CourierStage = 'PREPARING' | 'TO_RESTAURANT' | 'AT_RESTAURANT' | 'TO_CUSTOMER' | 'ARRIVED' | 'CANCELLED';
 
 interface SimulationOptions {
   order: Order;
   isActive: boolean;
-  maptilerKey?: string;
 }
 
-export function useCourierSimulation({ order, isActive, maptilerKey }: SimulationOptions) {
+export function useCourierSimulation({ order, isActive }: SimulationOptions) {
   const [courierPosition, setCourierPosition] = useState<[number, number] | null>(null);
-  const [routeGeoJSON, setRouteGeoJSON] = useState<GeoJSON.Feature<GeoJSON.LineString> | null>(null);
+  const [routeA, setRouteA] = useState<GeoJSON.Feature<GeoJSON.LineString> | null>(null);
+  const [routeB, setRouteB] = useState<GeoJSON.Feature<GeoJSON.LineString> | null>(null);
+  const [courierStage, setCourierStage] = useState<CourierStage>('PREPARING');
   const [isRouteLoading, setIsRouteLoading] = useState(false);
-  const [routeError, setRouteError] = useState<string | null>(null);
 
-  const startPoint = order.restaurant_longitude && order.restaurant_latitude 
-    ? [Number(order.restaurant_longitude), Number(order.restaurant_latitude)] as [number, number]
-    : null;
+  // Memoize stable coordinates
+  const startPoint = useMemo(() => {
+    return order.restaurant_longitude && order.restaurant_latitude 
+      ? [Number(order.restaurant_longitude), Number(order.restaurant_latitude)] as [number, number]
+      : null;
+  }, [order.restaurant_longitude, order.restaurant_latitude]);
     
-  const endPoint = order.delivery_longitude && order.delivery_latitude
-    ? [Number(order.delivery_longitude), Number(order.delivery_latitude)] as [number, number]
-    : null;
+  const endPoint = useMemo(() => {
+    return order.delivery_longitude && order.delivery_latitude
+      ? [Number(order.delivery_longitude), Number(order.delivery_latitude)] as [number, number]
+      : null;
+  }, [order.delivery_longitude, order.delivery_latitude]);
 
-  const animationRef = useRef<number | null>(null);
+  // Deterministic courier starting position based on order ID
+  const courierStart = useMemo(() => {
+    if (!startPoint) return null;
+    const bearing = (order.id * 37) % 360 - 180;
+    // 1.5 km away
+    return destination(startPoint, 1.5, bearing, { units: 'kilometers' }).geometry.coordinates as [number, number];
+  }, [startPoint, order.id]);
 
-  // Fetch route
+  // Fetch routes
   useEffect(() => {
-    if (!startPoint || !endPoint) return;
-
+    if (!startPoint || !endPoint || !courierStart) return;
+    
     let isMounted = true;
-    const fetchRoute = async () => {
-      setIsRouteLoading(true);
-      setRouteError(null);
 
-      // Create straight line fallback first
-      const straightLine = turf.lineString([startPoint, endPoint]);
-      
+    const fetchRoutes = async () => {
+      setIsRouteLoading(true);
       try {
-        if (!maptilerKey) throw new Error('No MapTiler API key');
+        // Fetch Route A: Courier Start -> Restaurant
+        const urlA = `https://router.project-osrm.org/route/v1/driving/${courierStart[0]},${courierStart[1]};${startPoint[0]},${startPoint[1]}?overview=full&geometries=geojson`;
+        const resA = await fetch(urlA);
+        let geomA = turf.lineString([courierStart, startPoint]);
         
-        // Try fetching a route
-        const url = `https://api.maptiler.com/routing/directions/driving/${startPoint[0]},${startPoint[1]};${endPoint[0]},${endPoint[1]}?key=${maptilerKey}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Routing API failed');
-        
-        const data = await response.json();
-        if (data.routes && data.routes.length > 0 && isMounted) {
-          // The geometry might be a LineString directly or an encoded polyline depending on MapTiler response format
-          // By default MapTiler returns a GeoJSON LineString geometry for the route
-          setRouteGeoJSON({
-            type: 'Feature',
-            properties: {},
-            geometry: data.routes[0].geometry
-          });
-          return;
+        if (resA.ok) {
+          const dataA = await resA.json();
+          if (dataA.routes && dataA.routes.length > 0) {
+            geomA = turf.feature(dataA.routes[0].geometry) as GeoJSON.Feature<GeoJSON.LineString>;
+          }
+        }
+
+        // Fetch Route B: Restaurant -> Customer
+        const urlB = `https://router.project-osrm.org/route/v1/driving/${startPoint[0]},${startPoint[1]};${endPoint[0]},${endPoint[1]}?overview=full&geometries=geojson`;
+        const resB = await fetch(urlB);
+        let geomB = turf.lineString([startPoint, endPoint]);
+
+        if (resB.ok) {
+          const dataB = await resB.json();
+          if (dataB.routes && dataB.routes.length > 0) {
+            geomB = turf.feature(dataB.routes[0].geometry) as GeoJSON.Feature<GeoJSON.LineString>;
+          }
+        }
+
+        if (isMounted) {
+          setRouteA(geomA);
+          setRouteB(geomB);
         }
       } catch (err) {
-        console.warn('Routing failed, using straight line fallback', err);
+        console.warn('Routing failed, using straight lines fallback', err);
+        if (isMounted) {
+          setRouteA(turf.lineString([courierStart, startPoint]));
+          setRouteB(turf.lineString([startPoint, endPoint]));
+        }
       } finally {
         if (isMounted) setIsRouteLoading(false);
       }
-
-      // Fallback to straight line
-      if (isMounted) {
-        setRouteGeoJSON(straightLine);
-      }
     };
 
-    void fetchRoute();
+    void fetchRoutes();
     return () => { isMounted = false; };
-  }, [startPoint?.[0], startPoint?.[1], endPoint?.[0], endPoint?.[1], maptilerKey]);
+  }, [courierStart?.[0], courierStart?.[1], startPoint?.[0], startPoint?.[1], endPoint?.[0], endPoint?.[1]]);
 
-  // Handle animation
+  // Animation Refs
+  const progressA = useRef(0);
+  const progressB = useRef(0);
+  const lastFrameTime = useRef(Date.now());
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Jump progress based on backend status
   useEffect(() => {
-    if (!isActive || !routeGeoJSON || !startPoint || !endPoint) {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      // If not active, put courier at destination if completed, or start if pending
-      if (order.status === 'COMPLETED') {
-        setCourierPosition(endPoint);
-      } else {
-        setCourierPosition(startPoint);
-      }
+    if (order.status === 'DELIVERING' && progressA.current < 1) {
+      // Force completion of Stage A if backend says we are already delivering
+      progressA.current = 1;
+    }
+  }, [order.status]);
+
+  // Main Simulation Loop
+  useEffect(() => {
+    if (!isActive || !routeA || !routeB || !startPoint || !endPoint || !courierStart) {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       return;
     }
 
-    const routeLength = length(routeGeoJSON, { units: 'kilometers' });
-    const durationMs = 30000; // Simulate 30s journey for MVP
+    if (order.status === 'CANCELLED') {
+      setCourierStage('CANCELLED');
+      return;
+    }
 
-    // Deterministic offset based on order creation time
-    // Assume delivery starts ~30s after order creation for this simulated MVP
-    const assumedDeliveryStartTime = new Date(order.created_at).getTime() + 30000;
-    
+    if (order.status === 'COMPLETED') {
+      setCourierStage('ARRIVED');
+      setCourierPosition(endPoint);
+      return;
+    }
+
+    let isAnimating = true;
+    lastFrameTime.current = Date.now();
+
     const animate = () => {
+      if (!isAnimating) return;
       const now = Date.now();
-      let elapsed = now - assumedDeliveryStartTime;
-      
-      // If the order somehow started delivering earlier than 30s, or we're running fast
-      if (elapsed < 0) elapsed = 0;
-      
-      let progress = elapsed / durationMs;
-      if (progress >= 1) progress = 1;
+      const delta = now - lastFrameTime.current;
+      lastFrameTime.current = now;
 
-      const currentDistance = routeLength * progress;
-      const currentPoint = along(routeGeoJSON, currentDistance, { units: 'kilometers' });
-      
-      setCourierPosition(currentPoint.geometry.coordinates as [number, number]);
-
-      if (progress < 1) {
-        animationRef.current = requestAnimationFrame(animate);
-      } else {
-        // If progress is >= 1, we don't need to keep animating until the backend catches up
-        if (order.status !== 'COMPLETED') {
-           // We might just poll a bit or stay at 99% until status updates
-           const nearEnd = along(routeGeoJSON, routeLength * 0.99, { units: 'kilometers' });
-           setCourierPosition(nearEnd.geometry.coordinates as [number, number]);
-        } else {
-           setCourierPosition(endPoint);
-        }
+      if (progressA.current < 1) {
+        setCourierStage('TO_RESTAURANT');
+        // Courier travels to restaurant (15s simulation duration)
+        progressA.current += delta / 15000;
+        if (progressA.current >= 1) progressA.current = 1;
+        
+        const len = length(routeA);
+        const pos = along(routeA, progressA.current * len).geometry.coordinates;
+        setCourierPosition(pos as [number, number]);
+      } 
+      else if (progressA.current >= 1 && order.status !== 'DELIVERING') {
+        // Reached restaurant, waiting for backend to hit DELIVERING
+        setCourierStage('AT_RESTAURANT');
+        setCourierPosition(startPoint);
       }
+      else if (progressA.current >= 1 && order.status === 'DELIVERING') {
+        setCourierStage('TO_CUSTOMER');
+        // Courier travels to customer (30s simulation duration)
+        progressB.current += delta / 30000;
+        if (progressB.current >= 1) progressB.current = 1;
+
+        const len = length(routeB);
+        // clamp to 0.999 to avoid exactly hitting the end before backend is COMPLETED
+        const pos = along(routeB, Math.min(progressB.current, 0.999) * len).geometry.coordinates;
+        setCourierPosition(pos as [number, number]);
+      }
+
+      animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    animationRef.current = requestAnimationFrame(animate);
+    animationFrameRef.current = requestAnimationFrame(animate);
 
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      isAnimating = false;
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [isActive, routeGeoJSON, startPoint, endPoint, order.status]);
+  }, [isActive, order.status, routeA, routeB, startPoint, endPoint, courierStart]);
 
   return {
     courierPosition,
-    routeGeoJSON,
+    routeA,
+    routeB,
     startPoint,
     endPoint,
-    isRouteLoading,
-    routeError
+    courierStart,
+    courierStage,
+    isRouteLoading
   };
 }
