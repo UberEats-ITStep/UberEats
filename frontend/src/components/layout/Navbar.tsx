@@ -1,20 +1,18 @@
-import { useState, type ChangeEvent } from 'react';
+import { useState } from 'react';
 import type { FC } from 'react';
-import { Link, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useCart } from '../../context/CartContext';
 import Button from '../common/Button';
-import Input from '../common/Input';
+import { SmartSearchBar } from '../../features/ai/components/SmartSearchBar';
 
 export const Navbar: FC = () => {
   const { isAuthenticated, logout } = useAuth();
   const { itemCount, setIsDrawerOpen } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  const searchQuery = searchParams.get('q') || '';
+
 
   const closeMenu = () => setMobileMenuOpen(false);
 
@@ -39,18 +37,7 @@ export const Navbar: FC = () => {
         : 'text-text-secondary hover:bg-secondary hover:text-primary'
     }`;
 
-  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value) {
-      setSearchParams({ q: value });
-      if (location.pathname !== '/' && location.pathname !== '/restaurants') {
-         navigate(`/?q=${encodeURIComponent(value)}`);
-      }
-    } else {
-      searchParams.delete('q');
-      setSearchParams(searchParams);
-    }
-  };
+
 
   return (
     <header className="sticky top-0 z-50 bg-surface/90 text-text-primary backdrop-blur-md border-b border-border-default">
@@ -85,20 +72,8 @@ export const Navbar: FC = () => {
           </div>
 
           {/* Flexible Search Bar */}
-          <div className="flex-1 max-w-md hidden sm:block">
-             <Input
-                type="search"
-                placeholder="Search..."
-                aria-label="Search restaurants or cuisines"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full bg-secondary border-transparent focus:bg-surface focus:border-border-focus"
-                leftIcon={
-                   <svg className="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                   </svg>
-                }
-             />
+          <div className="flex-1 max-w-md hidden sm:block relative z-50">
+             <SmartSearchBar />
           </div>
 
           {/* Desktop Right Actions */}
@@ -188,20 +163,8 @@ export const Navbar: FC = () => {
         </nav>
         
         {/* Mobile Search Bar (visible only on very small screens < sm) */}
-        <div className="sm:hidden pb-3">
-           <Input
-              type="search"
-              placeholder="Search..."
-              aria-label="Search restaurants"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full bg-secondary border-transparent focus:bg-surface focus:border-border-focus"
-              leftIcon={
-                 <svg className="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                 </svg>
-              }
-           />
+        <div className="sm:hidden pb-3 relative z-50">
+           <SmartSearchBar />
         </div>
       </div>
 

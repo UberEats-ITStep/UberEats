@@ -48,7 +48,8 @@ class GroqClient:
             raw_text = data["choices"][0]["message"]["content"]
             return json.loads(raw_text)
         except requests.exceptions.RequestException as e:
-            logger.error(f"Groq network error: {str(e)}")
+            error_body = e.response.text if e.response is not None else "No response body"
+            logger.error(f"Groq network error: {str(e)} | Body: {error_body}")
             raise GroqAPIException()
         except json.JSONDecodeError as e:
             logger.error(f"Groq returned invalid JSON: {str(e)}")
