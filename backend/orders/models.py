@@ -1,7 +1,7 @@
 from django.conf import settings
-from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 
 from restaurants.models import MenuItem, Restaurant
 
@@ -72,6 +72,22 @@ class Order(models.Model):
     contact_phone = models.CharField(max_length=20, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        delivery_latitude__isnull=True,
+                        delivery_longitude__isnull=True,
+                    )
+                    | models.Q(
+                        delivery_latitude__isnull=False,
+                        delivery_longitude__isnull=False,
+                    )
+                ),
+                name='order_delivery_coordinates_together',
+            ),
+        ]
     def clean(self):
         super().clean()
         if (self.delivery_latitude is None) != (self.delivery_longitude is None):

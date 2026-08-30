@@ -1,3 +1,5 @@
+from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -6,8 +8,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
-from .models import User
+from .models import DeliveryAddress, Profile, User
 from .serializers import (
+    DeliveryAddressSerializer,
     EmailTokenObtainPairSerializer,
     ForgotPasswordSerializer,
     ProfileSerializer,
@@ -76,6 +79,95 @@ class ProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user.profile
+
+
+class AvatarOptionsView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        return Response({
+            'avatars': [
+                {'id': avatar_id, 'label': label}
+                for avatar_id, label in Profile.Avatar.choices
+            ]
+        })
+
+
+class DeliveryAddressListCreateView(generics.ListCreateAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = DeliveryAddressSerializer
+
+    def get_queryset(self):
+        return DeliveryAddress.objects.filter(user=self.request.user)
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        user = User.objects.select_for_update().get(pk=self.request.user.pk)
+        has_default_address = DeliveryAddress.objects.filter(
+            user=user,
+            is_default=True,
+        ).exists()
+        serializer.save(user=user, is_default=not has_default_address)
+
+
+class DeliveryAddressDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = DeliveryAddressSerializer
+
+    def get_queryset(self):
+        return DeliveryAddress.objects.filter(user=self.request.user)
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        user = User.objects.select_for_update().get(pk=self.request.user.pk)
+        address = get_object_or_404(
+            DeliveryAddress.objects.select_for_update(),
+            pk=instance.pk,
+            user=user,
+        )
+        was_default = address.is_default
+        address.delete()
+
+        if was_default:
+            replacement = DeliveryAddress.objects.filter(user=user).first()
+            if replacement is not None:
+                replacement.is_default = True
+                replacement.save(update_fields=['is_default', 'updated_at'])
+
+
+class DefaultDeliveryAddressView(generics.RetrieveAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = DeliveryAddressSerializer
+
+    def get_object(self):
+        return get_object_or_404(
+            DeliveryAddress,
+            user=self.request.user,
+            is_default=True,
+        )
+
+
+class SetDefaultDeliveryAddressView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    @transaction.atomic
+    def post(self, request, pk):
+        user = User.objects.select_for_update().get(pk=request.user.pk)
+        address = get_object_or_404(
+            DeliveryAddress.objects.select_for_update(),
+            pk=pk,
+            user=user,
+        )
+
+        if not address.is_default:
+            DeliveryAddress.objects.filter(
+                user=user,
+                is_default=True,
+            ).update(is_default=False)
+            address.is_default = True
+            address.save(update_fields=['is_default', 'updated_at'])
+
+        return Response(DeliveryAddressSerializer(address).data)
 
 class ChangePasswordView(APIView):
     permission_classes = (permissions.IsAuthenticated,)

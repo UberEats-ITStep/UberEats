@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 
 from cart.models import Cart, CartItem
 from restaurants.models import Category, Cuisine, MenuItem, Restaurant
+from users.models import DeliveryAddress
 
 from orders.models import Order, OrderItem
 from orders.simulation import simulate_order_lifecycle
@@ -90,6 +91,23 @@ class OrderCheckoutApiTests(APITestCase):
             'contact_phone': '+380501234567',
         }
 
+    def create_delivery_address(self, user=None):
+        return DeliveryAddress.objects.create(
+            user=user or self.user,
+            label='Home',
+            formatted_address='Rivne, Soborna Street 15A',
+            street='Soborna Street',
+            building='15A',
+            apartment='25',
+            entrance='2',
+            floor=5,
+            delivery_notes='Call before delivery',
+            contact_phone='+380501234567',
+            latitude=Decimal('50.619000'),
+            longitude=Decimal('26.250000'),
+            is_default=True,
+        )
+
     def add_cart_item(self, quantity=1):
         cart, _ = Cart.objects.get_or_create(user=self.user)
 
@@ -136,19 +154,80 @@ class OrderCheckoutApiTests(APITestCase):
 
         self.assertEqual(response.data['total_price'], '21.00')
 
+    def test_checkout_with_saved_address_snapshots_delivery_details(self):
+        self.add_cart_item()
+        delivery_address = self.create_delivery_address()
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            {'delivery_address_id': delivery_address.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get()
+        self.assertEqual(order.street, delivery_address.street)
+        self.assertEqual(order.building, delivery_address.building)
+        self.assertEqual(order.apartment, delivery_address.apartment)
+        self.assertEqual(order.delivery_latitude, Decimal('50.619000'))
+        self.assertEqual(order.delivery_longitude, Decimal('26.250000'))
+        self.assertEqual(response.data['delivery_latitude'], '50.619000')
+        self.assertEqual(response.data['delivery_longitude'], '26.250000')
+
+    def test_checkout_rejects_another_users_saved_address(self):
+        self.add_cart_item()
+        other_users_address = self.create_delivery_address(self.other_user)
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            {'delivery_address_id': other_users_address.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('delivery_address_id', response.data)
+        self.assertFalse(Order.objects.exists())
+
+    def test_order_keeps_address_snapshot_after_saved_address_changes(self):
+        self.add_cart_item()
+        delivery_address = self.create_delivery_address()
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            {'delivery_address_id': delivery_address.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get()
+
+        delivery_address.street = 'Kyivska Street'
+        delivery_address.building = '45'
+        delivery_address.latitude = Decimal('50.620000')
+        delivery_address.longitude = Decimal('26.240000')
+        delivery_address.save()
+
+        order.refresh_from_db()
+        self.assertEqual(order.street, 'Soborna Street')
+        self.assertEqual(order.building, '15A')
+        self.assertEqual(order.delivery_latitude, Decimal('50.619000'))
+        self.assertEqual(order.delivery_longitude, Decimal('26.250000'))
 
     def test_checkout_with_coordinates(self):
         cart, _ = Cart.objects.get_or_create(user=self.user)
         CartItem.objects.create(cart=cart, menu_item=self.menu_item, quantity=2)
-
         self.client.force_authenticate(user=self.user)
-        
+
         response = self.client.post(
             self.checkout_url,
             {
-                'street': 'Main street', 'building': '1',
+                'street': 'Main street',
+                'building': '1',
                 'delivery_latitude': '50.450100',
-                'delivery_longitude': '30.523400'
+                'delivery_longitude': '30.523400',
             },
             format='json',
         )
@@ -157,41 +236,6 @@ class OrderCheckoutApiTests(APITestCase):
         order = Order.objects.get()
         self.assertEqual(order.delivery_latitude, Decimal('50.450100'))
         self.assertEqual(order.delivery_longitude, Decimal('30.523400'))
-
-    def test_snapshot_integrity(self):
-        # 1. Create a user with coordinates A.
-        self.user.profile.latitude = Decimal('50.620000')
-        self.user.profile.longitude = Decimal('26.250000')
-        self.user.profile.save()
-        
-        # 2. Create an order using coordinates A.
-        cart, _ = Cart.objects.get_or_create(user=self.user)
-        CartItem.objects.create(cart=cart, menu_item=self.menu_item, quantity=2)
-        
-        self.client.force_authenticate(user=self.user)
-        response = self.client.post(
-            self.checkout_url,
-            {
-                'street': 'Main street', 'building': '1',
-                'delivery_latitude': '50.620000',
-                'delivery_longitude': '26.250000'
-            },
-            format='json',
-        )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        order_id = response.data['id']
-        
-        # 3. Change the user's profile coordinates to coordinates B.
-        self.user.profile.latitude = Decimal('10.000000')
-        self.user.profile.longitude = Decimal('10.000000')
-        self.user.profile.save()
-        
-        # 4. Reload the existing Order.
-        order = Order.objects.get(id=order_id)
-        
-        # 5. Verify the Order still contains coordinates A.
-        self.assertEqual(order.delivery_latitude, Decimal('50.620000'))
-        self.assertEqual(order.delivery_longitude, Decimal('26.250000'))
 
     def test_api_response_format(self):
         self.restaurant.latitude = Decimal('50.615000')

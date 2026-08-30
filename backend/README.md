@@ -169,19 +169,80 @@ Response (`200 OK`):
 
 ```json
 {
+  "id": 1,
+  "email": "user@example.com",
   "phone_number": "+380001112233",
-  "address": "Kyiv"
+  "address": "Kyiv",
+  "avatar": "avatar_01",
+  "default_address": null
 }
 ```
 
-The same endpoint accepts `PUT` and `PATCH` to update these fields.
+The same endpoint accepts `PUT` and `PATCH` to update profile fields and the
+selected preset `avatar`. Valid avatars are exposed by
+`GET /api/profile/avatar-options/`. The `address` field is kept only for
+backwards compatibility; new clients should use saved delivery addresses.
 
 ```bash
 curl -X PATCH http://127.0.0.1:8000/api/profile/ \
   -H "Authorization: Bearer <access-token>" \
   -H "Content-Type: application/json" \
-  -d '{"address":"Lviv"}'
+  -d '{"avatar":"avatar_03"}'
 ```
+
+### Saved delivery addresses
+
+All saved-address endpoints require `Authorization: Bearer <access-token>`.
+Addresses are scoped to the authenticated user and never expose a user or
+profile relationship ID.
+
+- `GET /api/profile/addresses/` lists the user's saved addresses.
+- `POST /api/profile/addresses/` creates an address.
+- `GET`, `PATCH`, `DELETE /api/profile/addresses/<id>/` reads, updates, or removes an address.
+- `POST /api/profile/addresses/<id>/set-default/` selects the default address.
+- `GET /api/profile/addresses/default/` returns the current default address.
+
+```json
+{
+  "label": "Home",
+  "formatted_address": "Rivne, Soborna Street 12",
+  "street": "Soborna Street",
+  "building": "12",
+  "apartment": "44",
+  "entrance": "2",
+  "floor": 3,
+  "delivery_notes": "Call when near",
+  "contact_phone": "+380501234567",
+  "latitude": "50.619000",
+  "longitude": "26.250000"
+}
+```
+
+The first address becomes default automatically. Selecting another default
+address clears the prior default atomically. Deleting the default promotes the
+oldest remaining address, if one exists. Latitude and longitude are accepted
+only in an address create/update payload, must be supplied together, and must
+be within the valid geographic ranges. They are derived by the frontend address
+resolver and must not be presented as separate user-editable inputs.
+
+Existing non-empty `Profile.address` values are preserved by the data migration
+as a default `Home` saved address. Because legacy text cannot be safely split
+into street/building data or coordinates, it remains available for display and
+must be confirmed by the frontend resolver before it can be used for checkout.
+
+### Checkout with a saved address
+
+`POST /api/orders/checkout/` accepts either the existing structured manual
+address fields or an owned saved-address ID:
+
+```json
+{
+  "delivery_address_id": 1
+}
+```
+
+The selected address fields and coordinates are copied to the new order. Later
+changes to the saved address do not affect existing orders.
 
 ## JWT requirements
 

@@ -2,6 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from restaurants.models import MenuItem
+from users.models import DeliveryAddress
 
 from .models import Order, OrderItem
 
@@ -50,9 +51,13 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class CheckoutSerializer(serializers.Serializer):
-    street = serializers.CharField(max_length=255)
-    building = serializers.CharField(max_length=20)
-    
+    delivery_address_id = serializers.IntegerField(
+        required=False,
+        write_only=True,
+        min_value=1,
+    )
+    street = serializers.CharField(max_length=255, required=False)
+    building = serializers.CharField(max_length=20, required=False)
     delivery_latitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
     delivery_longitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
 
@@ -126,6 +131,53 @@ class CheckoutSerializer(serializers.Serializer):
             })
 
         user = self.context['request'].user
+        delivery_address_id = attrs.get('delivery_address_id')
+
+        manual_address_fields = {
+            'street',
+            'building',
+            'apartment',
+            'entrance',
+            'floor',
+            'delivery_notes',
+            'contact_phone',
+            'delivery_latitude',
+            'delivery_longitude',
+        }
+
+        if delivery_address_id is not None:
+            provided_manual_fields = manual_address_fields.intersection(attrs)
+            if provided_manual_fields:
+                raise serializers.ValidationError({
+                    'non_field_errors': (
+                        'Provide either delivery_address_id or manual delivery fields, not both.'
+                    )
+                })
+
+            delivery_address = DeliveryAddress.objects.filter(
+                pk=delivery_address_id,
+                user=user,
+            ).first()
+            if delivery_address is None:
+                raise serializers.ValidationError({
+                    'delivery_address_id': 'Delivery address not found.'
+                })
+            if not delivery_address.street or not delivery_address.building:
+                raise serializers.ValidationError({
+                    'delivery_address_id': (
+                        'This delivery address must be confirmed before checkout.'
+                    )
+                })
+
+            attrs['delivery_address'] = delivery_address
+        else:
+            missing_fields = {
+                field: 'This field is required.'
+                for field in ('street', 'building')
+                if field not in attrs
+            }
+            if missing_fields:
+                raise serializers.ValidationError(missing_fields)
 
         if not hasattr(user, 'cart') or not user.cart.items.exists():
             raise serializers.ValidationError({
@@ -151,6 +203,8 @@ class CheckoutSerializer(serializers.Serializer):
     def create(self, validated_data):
         user = self.context['request'].user
         cart = user.cart
+        delivery_address = validated_data.pop('delivery_address', None)
+        validated_data.pop('delivery_address_id', None)
 
         cart_items = cart.items.select_related(
             'menu_item'
@@ -158,19 +212,34 @@ class CheckoutSerializer(serializers.Serializer):
 
         restaurant = cart_items[0].menu_item.restaurant
 
-        order = Order.objects.create(
-            client=user,
-            restaurant=restaurant,
-            street=validated_data['street'],
-            building=validated_data['building'],
-            apartment=validated_data.get('apartment', ''),
-            entrance=validated_data.get('entrance', ''),
-            floor=validated_data.get('floor'),
-            delivery_notes=validated_data.get('delivery_notes', ''),
-            contact_phone=validated_data.get('contact_phone', ''),
-            delivery_latitude=validated_data.get('delivery_latitude'),
-            delivery_longitude=validated_data.get('delivery_longitude'),
-        )
+        if delivery_address is not None:
+            order = Order.objects.create(
+                client=user,
+                restaurant=restaurant,
+                street=delivery_address.street,
+                building=delivery_address.building,
+                apartment=delivery_address.apartment,
+                entrance=delivery_address.entrance,
+                floor=delivery_address.floor,
+                delivery_notes=delivery_address.delivery_notes,
+                contact_phone=delivery_address.contact_phone,
+                delivery_latitude=delivery_address.latitude,
+                delivery_longitude=delivery_address.longitude,
+            )
+        else:
+            order = Order.objects.create(
+                client=user,
+                restaurant=restaurant,
+                street=validated_data['street'],
+                building=validated_data['building'],
+                apartment=validated_data.get('apartment', ''),
+                entrance=validated_data.get('entrance', ''),
+                floor=validated_data.get('floor'),
+                delivery_notes=validated_data.get('delivery_notes', ''),
+                contact_phone=validated_data.get('contact_phone', ''),
+                delivery_latitude=validated_data.get('delivery_latitude'),
+                delivery_longitude=validated_data.get('delivery_longitude'),
+            )
 
         total_price = 0
         order_items_to_create = []
