@@ -1,9 +1,11 @@
+from importlib import import_module
 import re
 from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.apps import apps
 from django.core import mail
 from django.core.cache import cache
 from django.test import TestCase, override_settings
@@ -14,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.test import APITestCase
 from rest_framework.throttling import ScopedRateThrottle
 
-from .models import Profile, VerificationCode
+from .models import DeliveryAddress, Profile, VerificationCode
 
 
 # Start PostgreSQL before running these tests; the backend test suite expects the real database.
@@ -66,6 +68,35 @@ class UserModelTests(TestCase):
         )
 
         self.assertEqual(str(user.profile), 'alex@example.com Profile')
+
+
+class DeliveryAddressMigrationTests(TestCase):
+    def test_legacy_profile_address_becomes_default_home_address(self) -> None:
+        user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='legacy-address-user',
+                email='legacy-address@example.com',
+                password='TestPass123!',
+                is_verified=True,
+            ),
+        )
+        user.profile.address = 'Rivne, Soborna Street 12'
+        user.profile.save(update_fields=['address'])
+
+        migration = import_module(
+            'users.migrations.0007_profile_avatar_deliveryaddress'
+        )
+        migration.migrate_legacy_profile_addresses(apps, None)
+
+        address = DeliveryAddress.objects.get(user=user)
+        self.assertEqual(address.label, 'Home')
+        self.assertEqual(address.formatted_address, 'Rivne, Soborna Street 12')
+        self.assertEqual(address.street, '')
+        self.assertEqual(address.building, '')
+        self.assertIsNone(address.latitude)
+        self.assertIsNone(address.longitude)
+        self.assertTrue(address.is_default)
 
 
 class RegisterApiTests(APITestCase):
@@ -416,6 +447,306 @@ class JwtAuthApiTests(APITestCase):
         self.user.profile.refresh_from_db()
         self.assertEqual(other_user.profile.address, 'Lviv')
         self.assertEqual(self.user.profile.address, 'Kyiv')
+
+
+class SavedDeliveryAddressApiTests(APITestCase):
+    def setUp(self) -> None:
+        self.user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='address-owner',
+                email='address-owner@example.com',
+                password='TestPass123!',
+                is_verified=True,
+            ),
+        )
+        self.other_user = cast(
+            Any,
+            UserModel.objects.create_user(
+                username='other-address-owner',
+                email='other-address-owner@example.com',
+                password='TestPass123!',
+                is_verified=True,
+            ),
+        )
+        self.list_url = reverse('delivery-address-list')
+        self.default_url = reverse('delivery-address-default')
+        self.profile_url = reverse('profile')
+        self.avatar_options_url = reverse('avatar-options')
+
+    def address_data(self, **overrides: Any) -> dict[str, Any]:
+        data = {
+            'label': 'Home',
+            'formatted_address': 'Rivne, Soborna Street 12',
+            'street': 'Soborna Street',
+            'building': '12',
+            'apartment': '44',
+            'entrance': '2',
+            'floor': 3,
+            'delivery_notes': 'Call when near',
+            'contact_phone': '+380501234567',
+            'latitude': '50.619000',
+            'longitude': '26.250000',
+        }
+        data.update(overrides)
+        return data
+
+    def create_address(self, **overrides: Any) -> Response:
+        self.client.force_authenticate(user=self.user)
+        return cast(
+            Response,
+            self.client.post(
+                self.list_url,
+                self.address_data(**overrides),
+                format='json',
+            ),
+        )
+
+    def create_address_for(self, user: Any, **overrides: Any) -> DeliveryAddress:
+        data = self.address_data(**overrides)
+        return DeliveryAddress.objects.create(
+            user=user,
+            label=data['label'],
+            formatted_address=data['formatted_address'],
+            street=data['street'],
+            building=data['building'],
+            apartment=data['apartment'],
+            entrance=data['entrance'],
+            floor=data['floor'],
+            delivery_notes=data['delivery_notes'],
+            contact_phone=data['contact_phone'],
+            latitude=data['latitude'],
+            longitude=data['longitude'],
+            is_default=overrides.pop('is_default', False),
+        )
+
+    def test_authenticated_user_can_create_address_and_first_is_default(self) -> None:
+        response = self.create_address()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['is_default'])
+        self.assertEqual(response.data['latitude'], '50.619000')
+        self.assertEqual(response.data['longitude'], '26.250000')
+
+        address = DeliveryAddress.objects.get()
+        self.assertEqual(address.user, self.user)
+        self.assertTrue(address.is_default)
+
+    def test_unauthenticated_user_cannot_create_address(self) -> None:
+        response = cast(
+            Response,
+            self.client.post(
+                self.list_url,
+                self.address_data(),
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(DeliveryAddress.objects.exists())
+
+    def test_setting_default_unsets_previous_default(self) -> None:
+        first_response = self.create_address()
+        second_response = self.create_address(
+            label='Work',
+            formatted_address='Rivne, Kyivska Street 45',
+            street='Kyivska Street',
+            building='45',
+        )
+
+        response = cast(
+            Response,
+            self.client.post(
+                reverse('delivery-address-set-default', args=[second_response.data['id']]),
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['is_default'])
+        self.assertEqual(
+            DeliveryAddress.objects.filter(user=self.user, is_default=True).count(),
+            1,
+        )
+        self.assertFalse(
+            DeliveryAddress.objects.get(pk=first_response.data['id']).is_default
+        )
+
+    def test_deleting_default_promotes_remaining_address(self) -> None:
+        first_response = self.create_address()
+        second_response = self.create_address(
+            label='Work',
+            formatted_address='Rivne, Kyivska Street 45',
+            street='Kyivska Street',
+            building='45',
+        )
+
+        response = cast(
+            Response,
+            self.client.delete(
+                reverse('delivery-address-detail', args=[first_response.data['id']]),
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertTrue(
+            DeliveryAddress.objects.get(pk=second_response.data['id']).is_default
+        )
+
+    def test_default_address_endpoint_returns_current_default(self) -> None:
+        created = self.create_address()
+
+        response = cast(Response, self.client.get(self.default_url))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], created.data['id'])
+
+    def test_address_rejects_invalid_latitude(self) -> None:
+        response = self.create_address(latitude='90.000001')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('latitude', response.data)
+
+    def test_address_rejects_invalid_longitude(self) -> None:
+        response = self.create_address(longitude='180.000001')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('longitude', response.data)
+
+    def test_address_rejects_latitude_without_longitude(self) -> None:
+        data = self.address_data()
+        data.pop('longitude')
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.post(self.list_url, data, format='json'),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('longitude', response.data)
+
+    def test_address_rejects_longitude_without_latitude(self) -> None:
+        data = self.address_data()
+        data.pop('latitude')
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.post(self.list_url, data, format='json'),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('latitude', response.data)
+
+    def test_user_cannot_read_another_users_address(self) -> None:
+        other_address = self.create_address_for(self.other_user)
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.get(
+                reverse('delivery-address-detail', args=[other_address.id]),
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_user_cannot_update_another_users_address(self) -> None:
+        other_address = self.create_address_for(self.other_user)
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.patch(
+                reverse('delivery-address-detail', args=[other_address.id]),
+                {'label': 'Changed'},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        other_address.refresh_from_db()
+        self.assertEqual(other_address.label, 'Home')
+
+    def test_user_cannot_delete_another_users_address(self) -> None:
+        other_address = self.create_address_for(self.other_user)
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.delete(
+                reverse('delivery-address-detail', args=[other_address.id]),
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(DeliveryAddress.objects.filter(pk=other_address.id).exists())
+
+    def test_user_cannot_set_another_users_address_as_default(self) -> None:
+        other_address = self.create_address_for(self.other_user)
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.post(
+                reverse('delivery-address-set-default', args=[other_address.id]),
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(other_address.is_default)
+
+    def test_profile_accepts_valid_avatar_and_allows_changes(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        first_response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url,
+                {'avatar': 'avatar_03'},
+                format='json',
+            ),
+        )
+        second_response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url,
+                {'avatar': 'avatar_06'},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.data['avatar'], 'avatar_06')
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.avatar, 'avatar_06')
+
+    def test_profile_rejects_invalid_avatar(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.patch(
+                self.profile_url,
+                {'avatar': 'not-an-avatar'},
+                format='json',
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('avatar', response.data)
+
+    def test_avatar_options_returns_controlled_avatar_ids(self) -> None:
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(Response, self.client.get(self.avatar_options_url))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['avatars'][0]['id'], 'avatar_01')
+        self.assertEqual(len(response.data['avatars']), 6)
 
 
 @override_settings(

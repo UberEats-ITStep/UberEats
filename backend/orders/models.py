@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from restaurants.models import MenuItem, Restaurant
@@ -60,8 +61,39 @@ class Order(models.Model):
 
     delivery_notes = models.TextField(max_length=500, blank=True, default='')
     contact_phone = models.CharField(max_length=20, blank=True, default='')
+    delivery_latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)],
+    )
+    delivery_longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)],
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        delivery_latitude__isnull=True,
+                        delivery_longitude__isnull=True,
+                    )
+                    | models.Q(
+                        delivery_latitude__isnull=False,
+                        delivery_longitude__isnull=False,
+                    )
+                ),
+                name='order_delivery_coordinates_together',
+            ),
+        ]
 
     def __str__(self):
         return f'Order #{self.id} - {self.client.email}'

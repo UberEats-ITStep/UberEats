@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import User, Profile
+from .models import DeliveryAddress, Profile, User
 
 
 PHONE_NUMBER_VALIDATOR = RegexValidator(
@@ -16,6 +16,87 @@ PHONE_NUMBER_VALIDATOR = RegexValidator(
         'for example +380501234567.'
     ),
 )
+
+
+class DeliveryAddressSerializer(serializers.ModelSerializer):
+    floor = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=1,
+        max_value=100,
+    )
+    contact_phone = serializers.CharField(
+        max_length=16,
+        required=False,
+        allow_blank=True,
+        validators=[PHONE_NUMBER_VALIDATOR],
+    )
+
+    class Meta:
+        model = DeliveryAddress
+        fields = [
+            'id',
+            'label',
+            'formatted_address',
+            'street',
+            'building',
+            'apartment',
+            'entrance',
+            'floor',
+            'delivery_notes',
+            'contact_phone',
+            'latitude',
+            'longitude',
+            'is_default',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'id',
+            'is_default',
+            'created_at',
+            'updated_at',
+        ]
+
+    def validate_label(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Label cannot be empty.')
+        return value
+
+    def validate_street(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Street cannot be empty.')
+        return value
+
+    def validate_building(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError('Building cannot be empty.')
+        return value
+
+    def validate_contact_phone(self, value):
+        return value.strip()
+
+    def validate(self, attrs):
+        instance = self.instance
+        latitude = attrs.get(
+            'latitude',
+            instance.latitude if instance is not None else None,
+        )
+        longitude = attrs.get(
+            'longitude',
+            instance.longitude if instance is not None else None,
+        )
+
+        if (latitude is None) != (longitude is None):
+            missing_field = 'longitude' if longitude is None else 'latitude'
+            raise serializers.ValidationError({
+                missing_field: 'Latitude and longitude must both be set, or both be empty.'
+            })
+
+        return attrs
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -39,6 +120,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         max_length=500,
         required=False,
     )
+    default_address = serializers.SerializerMethodField()
 
     class Meta:
         model = Profile
@@ -52,7 +134,17 @@ class ProfileSerializer(serializers.ModelSerializer):
             'created_at',
             'phone_number',
             'address',
+            'avatar',
+            'default_address',
         ]
+
+    def get_default_address(self, instance):
+        default_address = instance.user.delivery_addresses.filter(
+            is_default=True
+        ).first()
+        if default_address is None:
+            return None
+        return DeliveryAddressSerializer(default_address).data
 
     def validate_email(self, value):
         email = value.lower()
