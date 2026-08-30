@@ -6,22 +6,6 @@ from django.conf import settings
 from django.db import migrations, models
 
 
-def migrate_legacy_profile_addresses(apps, schema_editor):
-    Profile = apps.get_model('users', 'Profile')
-    DeliveryAddress = apps.get_model('users', 'DeliveryAddress')
-
-    profiles = Profile.objects.exclude(address__isnull=True).exclude(address__exact='')
-    for profile in profiles.iterator():
-        formatted_address = profile.address.strip()
-        if formatted_address:
-            DeliveryAddress.objects.create(
-                user_id=profile.user_id,
-                label='Home',
-                formatted_address=formatted_address,
-                is_default=True,
-            )
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -58,9 +42,5 @@ class Migration(migrations.Migration):
                 'ordering': ['created_at', 'id'],
                 'constraints': [models.UniqueConstraint(condition=models.Q(('is_default', True)), fields=('user',), name='unique_default_delivery_address_per_user'), models.CheckConstraint(condition=models.Q(models.Q(('latitude__isnull', True), ('longitude__isnull', True)), models.Q(('latitude__isnull', False), ('longitude__isnull', False)), _connector='OR'), name='delivery_address_coordinates_together')],
             },
-        ),
-        migrations.RunPython(
-            migrate_legacy_profile_addresses,
-            migrations.RunPython.noop,
         ),
     ]

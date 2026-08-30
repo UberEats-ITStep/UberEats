@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
@@ -51,6 +52,14 @@ class Order(models.Model):
         decimal_places=2,
         default=0,
     )
+    delivery_latitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        validators=[MinValueValidator(-90), MaxValueValidator(90)],
+    )
+    delivery_longitude = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        validators=[MinValueValidator(-180), MaxValueValidator(180)],
+    )
 
     street = models.CharField(max_length=255)
     building = models.CharField(max_length=20)
@@ -61,21 +70,6 @@ class Order(models.Model):
 
     delivery_notes = models.TextField(max_length=500, blank=True, default='')
     contact_phone = models.CharField(max_length=20, blank=True, default='')
-    delivery_latitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(-90), MaxValueValidator(90)],
-    )
-    delivery_longitude = models.DecimalField(
-        max_digits=9,
-        decimal_places=6,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(-180), MaxValueValidator(180)],
-    )
-    
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -94,6 +88,13 @@ class Order(models.Model):
                 name='order_delivery_coordinates_together',
             ),
         ]
+    def clean(self):
+        super().clean()
+        if (self.delivery_latitude is None) != (self.delivery_longitude is None):
+            missing_field = "delivery_longitude" if self.delivery_longitude is None else "delivery_latitude"
+            raise ValidationError({
+                missing_field: "Delivery latitude and longitude must both be set, or both be empty."
+            })
 
     def __str__(self):
         return f'Order #{self.id} - {self.client.email}'

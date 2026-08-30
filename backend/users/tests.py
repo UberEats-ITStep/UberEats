@@ -85,7 +85,7 @@ class DeliveryAddressMigrationTests(TestCase):
         user.profile.save(update_fields=['address'])
 
         migration = import_module(
-            'users.migrations.0007_profile_avatar_deliveryaddress'
+            'users.migrations.0008_migrate_profile_addresses'
         )
         migration.migrate_legacy_profile_addresses(apps, None)
 
@@ -543,6 +543,22 @@ class SavedDeliveryAddressApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(DeliveryAddress.objects.exists())
+
+    def test_new_address_requires_checkout_fields(self) -> None:
+        data = self.address_data()
+        data.pop('street')
+        data.pop('building')
+        self.client.force_authenticate(user=self.user)
+
+        response = cast(
+            Response,
+            self.client.post(self.list_url, data, format='json'),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('street', response.data)
+        self.assertIn('building', response.data)
         self.assertFalse(DeliveryAddress.objects.exists())
 
     def test_setting_default_unsets_previous_default(self) -> None:

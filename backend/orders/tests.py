@@ -216,6 +216,55 @@ class OrderCheckoutApiTests(APITestCase):
         self.assertEqual(order.delivery_latitude, Decimal('50.619000'))
         self.assertEqual(order.delivery_longitude, Decimal('26.250000'))
 
+    def test_checkout_with_coordinates(self):
+        cart, _ = Cart.objects.get_or_create(user=self.user)
+        CartItem.objects.create(cart=cart, menu_item=self.menu_item, quantity=2)
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            {
+                'street': 'Main street',
+                'building': '1',
+                'delivery_latitude': '50.450100',
+                'delivery_longitude': '30.523400',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        order = Order.objects.get()
+        self.assertEqual(order.delivery_latitude, Decimal('50.450100'))
+        self.assertEqual(order.delivery_longitude, Decimal('30.523400'))
+
+    def test_api_response_format(self):
+        self.restaurant.latitude = Decimal('50.615000')
+        self.restaurant.longitude = Decimal('26.260000')
+        self.restaurant.save()
+        
+        cart, _ = Cart.objects.get_or_create(user=self.user)
+        CartItem.objects.create(cart=cart, menu_item=self.menu_item, quantity=1)
+        self.client.force_authenticate(user=self.user)
+        
+        self.client.post(
+            self.checkout_url,
+            {
+                'street': 'Main street', 'building': '1',
+                'delivery_latitude': '50.620000',
+                'delivery_longitude': '26.250000'
+            },
+            format='json',
+        )
+        order = Order.objects.get()
+        
+        response = self.client.get(reverse('order_detail', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        self.assertEqual(response.data['delivery_latitude'], '50.620000')
+        self.assertEqual(response.data['delivery_longitude'], '26.250000')
+        self.assertEqual(response.data['restaurant_latitude'], '50.615000')
+        self.assertEqual(response.data['restaurant_longitude'], '26.260000')
+
     def test_checkout_rejects_empty_items(self):
         Cart.objects.get_or_create(user=self.user)
 

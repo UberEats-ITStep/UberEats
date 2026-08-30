@@ -81,6 +81,16 @@ class DeliveryAddressSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         instance = self.instance
+
+        if instance is None:
+            missing_fields = {
+                field: 'This field is required.'
+                for field in ('street', 'building')
+                if not attrs.get(field)
+            }
+            if missing_fields:
+                raise serializers.ValidationError(missing_fields)
+
         latitude = attrs.get(
             'latitude',
             instance.latitude if instance is not None else None,
