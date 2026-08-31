@@ -470,6 +470,94 @@ class OrderCheckoutApiTests(APITestCase):
             '10.50',
         )
 
+    def test_menu_item_rename_preserves_order_snapshot(self):
+        self.add_cart_item()
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            self.valid_checkout_data(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        order = Order.objects.get()
+
+        # rename menu item
+        self.menu_item.name = 'Double Margherita'
+        self.menu_item.save()
+
+        response = self.client.get(reverse('order_detail', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['items'][0]['menu_item_name'], 'Margherita')
+
+    def test_restaurant_rename_preserves_order_snapshot(self):
+        self.add_cart_item()
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            self.valid_checkout_data(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        order = Order.objects.get()
+
+        # rename restaurant
+        self.restaurant.name = 'Pizza Roma'
+        self.restaurant.save()
+
+        response = self.client.get(reverse('order_detail', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['restaurant_name'], 'Pizza House')
+
+    def test_price_change_preserves_order_price_snapshot(self):
+        self.add_cart_item()
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            self.valid_checkout_data(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        order = Order.objects.get()
+
+        # change price of menu item
+        self.menu_item.price = Decimal('20.00')
+        self.menu_item.save()
+
+        response = self.client.get(reverse('order_detail', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['items'][0]['price'], '10.50')
+
+    def test_menu_item_deactivation_preserves_order_snapshot(self):
+        self.add_cart_item()
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            self.valid_checkout_data(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        order = Order.objects.get()
+
+        # mark menu item unavailable
+        self.menu_item.is_available = False
+        self.menu_item.save()
+
+        response = self.client.get(reverse('order_detail', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['items'][0]['menu_item_name'], 'Margherita')
+
     def test_user_cannot_view_another_users_order_details(self):
         order = self.create_order(self.other_user)
 
