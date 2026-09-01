@@ -8,12 +8,20 @@ from .models import Order, OrderItem
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    menu_item_name = serializers.CharField(source='menu_item.name', read_only=True)
+    menu_item_name = serializers.SerializerMethodField()
     subtotal = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
         fields = ['id', 'menu_item', 'menu_item_name', 'quantity', 'price', 'subtotal']
+
+    def get_menu_item_name(self, obj):
+        # Prefer the snapshot stored at checkout; fall back to the live name for existing records
+        if getattr(obj, 'menu_item_name_snapshot', None):
+            return obj.menu_item_name_snapshot
+        if getattr(obj, 'menu_item', None):
+            return obj.menu_item.name
+        return ''
 
     def get_subtotal(self, obj):
         return f'{obj.price * obj.quantity:.2f}'
@@ -21,7 +29,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
-    restaurant_name = serializers.CharField(source='restaurant.name', read_only=True)
+    restaurant_name = serializers.SerializerMethodField()
     restaurant_latitude = serializers.DecimalField(source='restaurant.latitude', max_digits=9, decimal_places=6, read_only=True)
     restaurant_longitude = serializers.DecimalField(source='restaurant.longitude', max_digits=9, decimal_places=6, read_only=True)
 
@@ -48,6 +56,14 @@ class OrderSerializer(serializers.ModelSerializer):
             'restaurant_longitude',
             'courier',
         ]
+
+    def get_restaurant_name(self, obj):
+        # Prefer the snapshot stored at checkout; fall back to the live restaurant name for existing records
+        if getattr(obj, 'restaurant_name_snapshot', None):
+            return obj.restaurant_name_snapshot
+        if getattr(obj, 'restaurant', None):
+            return obj.restaurant.name
+        return ''
 
 
 class CheckoutSerializer(serializers.Serializer):
@@ -225,6 +241,7 @@ class CheckoutSerializer(serializers.Serializer):
                 contact_phone=delivery_address.contact_phone,
                 delivery_latitude=delivery_address.latitude,
                 delivery_longitude=delivery_address.longitude,
+                restaurant_name_snapshot=restaurant.name,
             )
         else:
             order = Order.objects.create(
@@ -239,6 +256,7 @@ class CheckoutSerializer(serializers.Serializer):
                 contact_phone=validated_data.get('contact_phone', ''),
                 delivery_latitude=validated_data.get('delivery_latitude'),
                 delivery_longitude=validated_data.get('delivery_longitude'),
+                restaurant_name_snapshot=restaurant.name,
             )
 
         total_price = 0
@@ -255,6 +273,8 @@ class CheckoutSerializer(serializers.Serializer):
                     menu_item=item.menu_item,
                     quantity=item.quantity,
                     price=item.menu_item.price,
+                    menu_item_name_snapshot=item.menu_item.name,
+                    restaurant_name_snapshot=restaurant.name,
                 )
             )
 
