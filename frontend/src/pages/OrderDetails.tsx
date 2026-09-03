@@ -1,15 +1,16 @@
 import type { FC } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Alert, Card, LoadingState, SectionContainer } from '../components/common';
+import { SectionContainer, Card, Alert, LoadingState } from '../components/common';
 import OrderItemsList from '../features/orders/components/OrderItemsList';
 import OrderStatusBadge from '../features/orders/components/OrderStatusBadge';
-import { useOrderDetails } from '../features/orders/hooks/useOrderDetails';
+import OrderTracker from '../features/orders/components/OrderTracker';
+import { useOrderTracking } from '../features/orders/hooks/useOrderTracking';
 import { formatOrderDate } from '../features/orders/utils/order.utils';
 import { formatPrice } from '../utils/currency';
 
 const OrderDetails: FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
-  const { order, isLoading, error, reload } = useOrderDetails(orderId);
+  const { order, isLoading, error, backgroundError, reload } = useOrderTracking(orderId);
 
   if (isLoading) {
     return <LoadingState message="Loading order details..." />;
@@ -22,7 +23,7 @@ const OrderDetails: FC = () => {
           variant="error"
           title="Order unavailable"
           message={error ?? 'This order is not available.'}
-          onRetry={orderId ? reload : undefined}
+          onRetry={orderId ? () => reload() : undefined}
         />
         <Link to="/orders" className="mt-6 inline-block text-sm font-medium underline underline-offset-4">
           Back to your orders
@@ -40,6 +41,12 @@ const OrderDetails: FC = () => {
         ← Back to orders
       </Link>
 
+      {backgroundError && (
+        <div className="mb-8 rounded-none border border-warning bg-warning/10 p-3 text-sm text-warning">
+          {backgroundError}
+        </div>
+      )}
+
       <div className="layout-grid">
         {/* Left Column: Primary Status / Map Area */}
         <div className="col-span-1 md:col-span-4 lg:col-span-8 flex flex-col gap-8">
@@ -56,14 +63,7 @@ const OrderDetails: FC = () => {
             </div>
           </header>
 
-          {/* This is where a Map would conditionally take over if they had one */}
-          {isDelivering && (
-            <div className="w-full h-64 lg:h-96 bg-secondary flex items-center justify-center border border-border-default">
-              <div className="text-text-muted text-sm uppercase tracking-widest font-bold">
-                [ Live Delivery Map Active ]
-              </div>
-            </div>
-          )}
+          <OrderTracker order={order} />
 
           {isCompleted && (
             <div className="w-full p-8 bg-surface-muted border border-border-default">
@@ -89,8 +89,21 @@ const OrderDetails: FC = () => {
             <Card elevation="none" padding="none" className="bg-transparent border-t border-border-default pt-6 rounded-none">
               <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted mb-4">Delivery Details</h2>
               <p className="text-lg text-text-primary font-serif italic mb-4">
-                {order.delivery_address || 'No delivery address was provided.'}
+                {(
+                  (order.street && order.building && `${order.street}, ${order.building}`) ||
+                  (order.street && `${order.street}`) ||
+                  'No delivery address was provided.'
+                )}
               </p>
+              { (order.apartment || order.entrance || order.floor || order.delivery_notes || order.contact_phone) && (
+                <div className="mb-4 text-sm text-text-secondary space-y-1">
+                  {order.apartment && <div><span className="font-medium text-text-primary">Apt:</span> {order.apartment}</div>}
+                  {order.entrance && <div><span className="font-medium text-text-primary">Entrance:</span> {order.entrance}</div>}
+                  {order.floor != null && <div><span className="font-medium text-text-primary">Floor:</span> {order.floor}</div>}
+                  {order.delivery_notes && <div><span className="font-medium text-text-primary">Notes:</span> {order.delivery_notes}</div>}
+                  {order.contact_phone && <div><span className="font-medium text-text-primary">Phone:</span> {order.contact_phone}</div>}
+                </div>
+              )}
               {order.restaurant && (
                 <Link
                   to={`/restaurants/${order.restaurant}`}

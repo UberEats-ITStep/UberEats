@@ -3,40 +3,40 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.hashers import make_password, check_password
 from django.core.mail import send_mail
+from django.db import transaction
 from django.utils import timezone
 from django.utils.html import strip_tags
 
-from users.models import VerificationCode
+from users.models import User, VerificationCode
 
 
 def generate_verification_code(user, purpose="EMAIL_VERIFICATION"):
-    # Check cooldown (60 seconds)
-    recent_code = VerificationCode.objects.filter(
-        user=user,
-        purpose=purpose,
-        created_at__gte=timezone.now() - timedelta(seconds=60),
-    ).first()
+    with transaction.atomic():
+        # Serialize code issuance per user so simultaneous resend requests cannot
+        # both pass the cooldown check and send competing codes.
+        user = User.objects.select_for_update().get(pk=user.pk)
+        now = timezone.now()
+        recent_code = VerificationCode.objects.filter(
+            user=user,
+            purpose=purpose,
+            created_at__gte=now - timedelta(seconds=60),
+        ).first()
 
-    if recent_code:
-        raise ValueError("Please wait before requesting another verification code.")
+        if recent_code:
+            raise ValueError("Please wait before requesting another verification code.")
 
-    # Delete previous unused codes for this purpose
-    VerificationCode.objects.filter(user=user, purpose=purpose).delete()
+        VerificationCode.objects.filter(user=user, purpose=purpose).delete()
+        plaintext_code = str(secrets.randbelow(1000000)).zfill(6)
+        expiration_minutes = getattr(
+            settings, "EMAIL_VERIFICATION_CODE_EXPIRATION_MINUTES", 15
+        )
 
-    # Generate cryptographically secure 6-digit code
-    plaintext_code = str(secrets.randbelow(1000000)).zfill(6)
-
-    # Store hashed version
-    expiration_minutes = getattr(
-        settings, "EMAIL_VERIFICATION_CODE_EXPIRATION_MINUTES", 15
-    )
-
-    VerificationCode.objects.create(
-        user=user,
-        purpose=purpose,
-        code_hash=make_password(plaintext_code),
-        expires_at=timezone.now() + timedelta(minutes=expiration_minutes),
-    )
+        VerificationCode.objects.create(
+            user=user,
+            purpose=purpose,
+            code_hash=make_password(plaintext_code),
+            expires_at=now + timedelta(minutes=expiration_minutes),
+        )
 
     return plaintext_code
 
