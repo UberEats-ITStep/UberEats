@@ -3,10 +3,20 @@ import type { Review, ReviewPayload, PaginatedReviews } from '../types/review.ty
 
 export const reviewService = {
   async getReviews(restaurantId: number, page = 1, signal?: AbortSignal): Promise<PaginatedReviews> {
-    const response = await apiClient.get<PaginatedReviews>(`/reviews/`, {
+    const response = await apiClient.get<Review[] | PaginatedReviews>(`/reviews/`, {
       params: { restaurant: restaurantId, page },
       signal,
     });
+
+    if (Array.isArray(response.data)) {
+      return {
+        count: response.data.length,
+        next: null,
+        previous: null,
+        results: response.data,
+      };
+    }
+
     return response.data;
   },
 

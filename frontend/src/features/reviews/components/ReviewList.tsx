@@ -75,7 +75,7 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
     }
   };
 
-  const hasReviews = reviews.length > 0;
+  const hasReviews = Array.isArray(reviews) && reviews.length > 0;
 
   return (
     <div className="py-16">
@@ -138,7 +138,7 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
 
       {!isLoading && !error && hasReviews && (
         <div className="grid grid-cols-1 gap-6">
-          {reviews.map(review => (
+          {(reviews || []).map(review => (
             <ReviewCard
               key={review.id}
               review={review}

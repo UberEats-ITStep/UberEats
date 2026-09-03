@@ -71,6 +71,7 @@ class Order(models.Model):
     delivery_notes = models.TextField(max_length=500, blank=True, default='')
     contact_phone = models.CharField(max_length=20, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
+    restaurant_name_snapshot = models.CharField(max_length=255, blank=True, default='')
 
     class Meta:
         constraints = [
@@ -116,10 +117,13 @@ class OrderItem(models.Model):
         max_digits=10,
         decimal_places=2,
     )
+    menu_item_name_snapshot = models.CharField(max_length=255, blank=True, default='')
+    restaurant_name_snapshot = models.CharField(max_length=255, blank=True, default='')
 
     @property
     def line_total(self):
         return self.price * self.quantity
 
     def __str__(self):
-        return f'{self.menu_item.name} x {self.quantity}'
+        name = self.menu_item_name_snapshot or self.menu_item.name
+        return f'{name} x {self.quantity}'

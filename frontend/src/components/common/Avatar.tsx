@@ -1,11 +1,11 @@
-import type { FC } from 'react';
+import type { FC, ReactElement } from 'react';
 
 type AvatarId = 'avatar_01' | 'avatar_02' | 'avatar_03' | 'avatar_04' | 'avatar_05' | 'avatar_06';
 
 const DEFAULT_AVATAR: AvatarId = 'avatar_01';
 const VALID_IDS: AvatarId[] = ['avatar_01', 'avatar_02', 'avatar_03', 'avatar_04', 'avatar_05', 'avatar_06'];
 
-const GLYPHS: Record<AvatarId, JSX.Element> = {
+const GLYPHS: Record<AvatarId, ReactElement> = {
   avatar_01: <line x1="16" y1="32" x2="48" y2="32" className="stroke-text-primary" strokeWidth="2" />,
   avatar_02: (
     <g className="fill-text-primary">
