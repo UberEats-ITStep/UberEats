@@ -1,9 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC, ChangeEvent, FormEvent } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
-import Input from '../../../components/common/Input';
 import { useAIRecommendation } from '../hooks/useAIRecommendation';
-import { AIRecommendationPanel } from './AIRecommendationPanel';
+import { SearchSurface } from './SearchSurface';
 
 export const SmartSearchBar: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,31 +14,31 @@ export const SmartSearchBar: FC = () => {
   
   const { data, isLoading, error, fetchRecommendations, reset } = useAIRecommendation();
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sync normal search query from URL when not in AI mode
   useEffect(() => {
     if (!isAiMode) {
       setLocalQuery(searchParams.get('q') || '');
     }
   }, [searchParams, isAiMode]);
 
-  // Click outside to close AI panel
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        reset();
+        if (isAiMode && !localQuery) {
+          setIsAiMode(false);
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [reset]);
+  }, [isAiMode, localQuery]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setLocalQuery(value);
 
     if (!isAiMode) {
-      // Normal search behavior: update URL params immediately
       if (value) {
         setSearchParams({ q: value });
         if (location.pathname !== '/' && location.pathname !== '/restaurants') {
@@ -52,89 +51,130 @@ export const SmartSearchBar: FC = () => {
     }
   };
 
+  const handleRetry = useCallback(() => {
+    if (localQuery.trim()) {
+      void fetchRecommendations(localQuery);
+    }
+  }, [localQuery, fetchRecommendations]);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (isAiMode && localQuery.trim() && !isLoading) {
       void fetchRecommendations(localQuery);
+      inputRef.current?.blur();
     }
   };
 
   const toggleAiMode = () => {
     const newMode = !isAiMode;
     setIsAiMode(newMode);
-    setLocalQuery('');
-    reset();
     
-    // Clear normal search if switching to AI mode
     if (newMode) {
+      setLocalQuery('');
+      reset();
       if (searchParams.has('q')) {
         searchParams.delete('q');
         setSearchParams(searchParams);
       }
+      setTimeout(() => inputRef.current?.focus(), 0);
+    } else {
+      reset();
+      setLocalQuery(searchParams.get('q') || '');
     }
   };
 
+  const handleCloseSurface = useCallback(() => {
+    setIsAiMode(false);
+    reset();
+  }, [reset]);
+
+  const isSurfaceOpen = isAiMode;
+
   return (
-    <div ref={containerRef} className="relative w-full">
-      <form onSubmit={handleSubmit} className="relative flex items-center">
-        <div className="relative w-full flex items-center">
-          <Input
+    <div ref={containerRef} className="relative w-full z-50 group">
+      <form 
+        onSubmit={handleSubmit} 
+        className={`relative flex items-center transition-all duration-200 ease-in-out border bg-surface ${
+          isAiMode 
+            ? 'border-primary shadow-subtle' 
+            : 'border-border-default hover:border-text-muted focus-within:border-primary'
+        }`}
+      >
+        <div className="relative w-full flex items-center h-10">
+          <span className="absolute left-3 flex items-center justify-center text-text-muted pointer-events-none transition-colors duration-200">
+            {isAiMode ? (
+              // AI Active icon - small sparkle/star from HeroIcons (not an emoji) or just a simple command-like icon
+              <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            ) : (
+              // Search icon
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            )}
+          </span>
+          
+          <input
+            ref={inputRef}
             type="text"
-            placeholder={isAiMode ? "Describe what you're craving..." : "Search restaurants..."}
+            placeholder={isAiMode ? "What are you in the mood for?" : "Search restaurants..."}
             aria-label={isAiMode ? "AI semantic search" : "Search restaurants"}
             value={localQuery}
             onChange={handleInputChange}
-            className={`w-full pr-[100px] transition-colors ${
-              isAiMode 
-                ? 'bg-surface border-text-primary focus:border-text-primary focus:ring-1 focus:ring-text-primary' 
-                : 'bg-secondary border-transparent focus:bg-surface focus:border-border-focus'
+            className={`w-full h-full pl-9 pr-14 bg-transparent outline-none text-sm placeholder:text-text-muted transition-colors ${
+              isAiMode ? 'text-primary' : 'text-text-primary'
             }`}
-            leftIcon={
-              isAiMode ? (
-                <span className="text-xl">✨</span>
-              ) : (
-                <svg className="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              )
-            }
           />
           
-          {/* AI Toggle Button */}
-          <div className="absolute right-1 flex items-center gap-1">
-            {isAiMode && (
+          <div className="absolute right-1 flex items-center h-full">
+            {isAiMode ? (
+              <div className="flex items-center">
+                {localQuery.trim() && (
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="p-1.5 mr-1 text-primary hover:text-primary-hover disabled:opacity-50 transition-colors focus:outline-none focus:ring-1 focus:ring-primary rounded-sm"
+                    aria-label="Submit AI request"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={toggleAiMode}
+                  className="p-1.5 text-text-muted hover:text-text-primary transition-colors focus:outline-none focus:ring-1 focus:ring-primary rounded-sm mr-1"
+                  aria-label="Exit AI Mode"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
               <button
-                type="submit"
-                disabled={isLoading || !localQuery.trim()}
-                className="p-2 text-text-primary hover:bg-secondary disabled:opacity-50 transition-colors"
-                aria-label="Submit AI request"
+                type="button"
+                onClick={toggleAiMode}
+                className="mr-2 px-2 py-1 text-[11px] font-bold tracking-widest uppercase text-text-muted hover:text-text-primary transition-colors focus:outline-none focus:ring-1 focus:ring-primary rounded-sm border border-transparent hover:border-border-default"
+                aria-label="Enter AI Mode"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
+                AI Search
               </button>
             )}
-            <button
-              type="button"
-              onClick={toggleAiMode}
-              className={`px-3 py-1.5 text-xs font-bold tracking-widest uppercase transition-colors border-l border-transparent ${
-                isAiMode 
-                  ? 'text-surface bg-text-primary hover:opacity-90' 
-                  : 'text-text-secondary hover:text-text-primary hover:bg-secondary'
-              }`}
-            >
-              AI Mode
-            </button>
           </div>
         </div>
       </form>
 
-      {/* Recommendations Dropdown */}
-      <AIRecommendationPanel 
-        data={data} 
-        isLoading={isLoading} 
-        error={error} 
-        onClose={reset} 
+      <SearchSurface 
+        isOpen={isSurfaceOpen}
+        data={data}
+        isLoading={isLoading}
+        error={error}
+        onClose={handleCloseSurface}
+        onRetry={handleRetry}
+        query={localQuery}
       />
     </div>
   );

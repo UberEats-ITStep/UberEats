@@ -32,7 +32,7 @@ export const CartDrawer: FC = () => {
       return <Alert variant="error" title="Error" message={error} />;
     }
 
-    if (!cart || cart.items.length === 0) {
+    if (!cart || !cart.items || cart.items.length === 0) {
       return (
         <div className="flex h-full flex-col justify-center">
           <EmptyState
@@ -66,9 +66,9 @@ export const CartDrawer: FC = () => {
               <div className="flex flex-1 flex-col justify-between">
                 <div>
                   <div className="flex justify-between text-base font-medium text-text-primary">
-                    <h3 className="line-clamp-2 pr-4">{item.menu_item_detail.name}</h3>
+                    <h3 className="line-clamp-2 pr-4">{item.menu_item_detail?.name || 'Unknown item'}</h3>
                     <p className="whitespace-nowrap font-bold">
-                      {formatPrice(parseFloat(item.menu_item_detail.price))}
+                      {item.menu_item_detail?.price ? formatPrice(parseFloat(item.menu_item_detail.price)) : ''}
                     </p>
                   </div>
                 </div>

@@ -31,56 +31,89 @@ const OrderDetails: FC = () => {
     );
   }
 
+  const isDelivering = order.status === 'Delivering';
+  const isCompleted = order.status === 'Completed' || order.status === 'Cancelled';
+
   return (
-    <SectionContainer width="content" padding="lg" className="pb-16 pt-10">
-      <Link to="/orders" className="mb-8 inline-block text-sm text-text-secondary underline underline-offset-4">
-        ← Back to your orders
+    <SectionContainer width="page" padding="lg" className="pb-16 pt-10">
+      <Link to="/orders" className="mb-8 inline-block text-xs uppercase tracking-widest text-text-secondary font-bold hover:text-text-primary transition-colors">
+        ← Back to orders
       </Link>
 
-      <header className="mb-8 flex flex-col gap-5 border-b border-text-primary pb-6 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="mb-2 text-sm uppercase tracking-widest text-text-muted">Order #{order.id}</p>
-          <h1 className="font-serif text-4xl italic text-text-primary sm:text-5xl">
-            {order.restaurant_name ?? 'Restaurant order'}
-          </h1>
-          <p className="mt-3 text-text-secondary">Placed {formatOrderDate(order.created_at)}</p>
+      <div className="layout-grid">
+        {/* Left Column: Primary Status / Map Area */}
+        <div className="col-span-1 md:col-span-4 lg:col-span-8 flex flex-col gap-8">
+          
+          <header className={`flex flex-col border-b border-border-default pb-8 ${isDelivering ? 'mb-4' : 'mb-0'}`}>
+            <p className="mb-3 text-xs uppercase tracking-widest text-text-muted font-bold">Order #{order.id}</p>
+            <h1 className="font-serif italic text-text-primary text-4xl lg:text-6xl mb-4">
+              {order.restaurant_name ?? 'Restaurant order'}
+            </h1>
+            
+            <div className="flex flex-wrap items-center gap-4 mt-2">
+              <OrderStatusBadge status={order.status} />
+              <p className="text-text-secondary text-sm">Placed {formatOrderDate(order.created_at)}</p>
+            </div>
+          </header>
+
+          {/* This is where a Map would conditionally take over if they had one */}
+          {isDelivering && (
+            <div className="w-full h-64 lg:h-96 bg-secondary flex items-center justify-center border border-border-default">
+              <div className="text-text-muted text-sm uppercase tracking-widest font-bold">
+                [ Live Delivery Map Active ]
+              </div>
+            </div>
+          )}
+
+          {isCompleted && (
+            <div className="w-full p-8 bg-surface-muted border border-border-default">
+              <h3 className="font-serif italic text-2xl text-text-primary mb-2">Order Complete</h3>
+              <p className="text-text-secondary">We hope you enjoyed your meal.</p>
+              <button className="mt-6 px-6 py-3 bg-primary text-surface text-xs uppercase tracking-widest font-bold hover:bg-primary-hover transition-colors">
+                Reorder
+              </button>
+            </div>
+          )}
+
+          <div className="mt-8">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted mb-6">Ordered items</h2>
+            <OrderItemsList items={order.items} />
+          </div>
+
         </div>
-        <OrderStatusBadge status={order.status} />
-      </header>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <Card padding="lg" className="rounded-none">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">Ordered items</h2>
-          <OrderItemsList items={order.items} />
-        </Card>
+        {/* Right Column: Order Details */}
+        <div className="col-span-1 md:col-span-4 lg:col-span-4">
+          <div className="sticky top-24 space-y-8">
+            
+            <Card elevation="none" padding="none" className="bg-transparent border-t border-border-default pt-6 rounded-none">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted mb-4">Delivery Details</h2>
+              <p className="text-lg text-text-primary font-serif italic mb-4">
+                {order.delivery_address || 'No delivery address was provided.'}
+              </p>
+              {order.restaurant && (
+                <Link
+                  to={`/restaurants/${order.restaurant}`}
+                  className="text-xs uppercase tracking-widest font-bold text-text-primary hover:text-text-muted transition-colors border-b border-text-primary pb-1"
+                >
+                  View restaurant
+                </Link>
+              )}
+            </Card>
 
-        <div className="space-y-8">
-          <Card padding="lg" className="rounded-none">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">Delivery</h2>
-            <p className="mt-4 text-lg text-text-primary">
-              {order.delivery_address || 'No delivery address was provided.'}
-            </p>
-            {order.restaurant && (
-              <Link
-                to={`/restaurants/${order.restaurant}`}
-                className="mt-5 inline-block text-sm font-medium underline underline-offset-4"
-              >
-                View restaurant
-              </Link>
-            )}
-          </Card>
+            <Card elevation="none" padding="none" className="bg-transparent border-t border-border-default pt-6 rounded-none">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted mb-4">Payment Summary</h2>
+              <div className="flex items-center justify-between pb-4 text-text-secondary text-sm">
+                <span>Items subtotal</span>
+                <span>{formatPrice(order.total_price)}</span>
+              </div>
+              <div className="flex items-center justify-between pt-4 border-t border-border-subtle">
+                <span className="text-xs uppercase tracking-widest font-bold text-text-primary">Order total</span>
+                <span className="font-serif text-2xl italic text-text-primary">{formatPrice(order.total_price)}</span>
+              </div>
+            </Card>
 
-          <Card padding="lg" className="rounded-none">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">Payment summary</h2>
-            <div className="mt-5 flex items-center justify-between border-b border-border-default pb-4 text-text-secondary">
-              <span>Items subtotal</span>
-              <span>{formatPrice(order.total_price)}</span>
-            </div>
-            <div className="flex items-center justify-between pt-5">
-              <span className="font-bold text-text-primary">Order total</span>
-              <span className="font-serif text-2xl italic text-text-primary">{formatPrice(order.total_price)}</span>
-            </div>
-          </Card>
+          </div>
         </div>
       </div>
     </SectionContainer>

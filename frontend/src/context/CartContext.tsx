@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { cartService } from '../features/cart/api/cart.service';
 import type { Cart } from '../features/cart/types/cart.types';
 import { useAuth } from '../hooks/useAuth';
@@ -172,11 +172,18 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const cartTotal = cart?.items.reduce((total, item) => {
-    return total + (parseFloat(item.menu_item_detail.price) * item.quantity);
-  }, 0) || 0;
+  const cartTotal = useMemo(() => {
+    if (!cart?.items || !Array.isArray(cart.items)) return 0;
+    return cart.items.reduce((total, item) => {
+      const price = item.menu_item_detail?.price ? parseFloat(item.menu_item_detail.price) : 0;
+      return total + (isNaN(price) ? 0 : price) * item.quantity;
+    }, 0);
+  }, [cart]);
 
-  const itemCount = cart?.items.reduce((count, item) => count + item.quantity, 0) || 0;
+  const itemCount = useMemo(() => {
+    if (!cart?.items || !Array.isArray(cart.items)) return 0;
+    return cart.items.reduce((count, item) => count + item.quantity, 0);
+  }, [cart]);
 
   return (
     <CartContext.Provider

@@ -1,0 +1,52 @@
+/* Editorial hero geometry. */
+.editorial-hero { height: 220svh; }
+.editorial-hero__stage { height: 100svh; }
+
+/* One image only; the visible frame is controlled by clip-path. */
+.editorial-hero__photo { clip-path: inset(16% 7% 14% 36%); }
+
+.editorial-hero__opening {
+  left: 2.5vw;
+  top: 51%;
+  width: 32vw;
+  max-width: 35rem;
+  transform: translateY(-50%);
+  font-size: clamp(4.5rem, 5.35vw, 7.2rem);
+  line-height: 0.78;
+  letter-spacing: -0.045em;
+}
+
+.editorial-hero__opening > span + span {
+  margin-top: -0.02em;
+  font-size: clamp(5rem, 6.1vw, 8.2rem);
+}
+
+.editorial-hero__opening-detail { right: 7%; bottom: 4.5%; }
+
+@media (max-width: 767px) {
+  .editorial-hero { height: 190svh; }
+
+  /* Symmetric frame: the image never translates horizontally during reveal. */
+  .editorial-hero__photo { clip-path: inset(14% 7% 27% 7%); }
+
+  .editorial-hero__opening {
+    left: 7%;
+    right: 7%;
+    bottom: 7%;
+    top: auto;
+    width: auto;
+    max-width: none;
+    transform: none;
+    font-size: clamp(3.1rem, 13.2vw, 4.8rem);
+    line-height: 0.8;
+  }
+
+  .editorial-hero__opening > span + span {
+    margin-top: -0.02em;
+    font-size: clamp(3.65rem, 15.1vw, 5.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editorial-hero__photo { clip-path: inset(0); }
+}

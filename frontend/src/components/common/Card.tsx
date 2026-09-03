@@ -10,10 +10,10 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const elevationClasses = {
-  none: 'shadow-none border border-border-default',
-  subtle: 'shadow-subtle border border-border-default',
-  elevated: 'shadow-elevated border border-border-subtle',
-  floating: 'shadow-floating border border-border-subtle',
+  none: 'shadow-none',
+  subtle: 'shadow-subtle border border-border-subtle/50',
+  elevated: 'shadow-elevated',
+  floating: 'shadow-floating',
 };
 
 const radiusClasses = {
