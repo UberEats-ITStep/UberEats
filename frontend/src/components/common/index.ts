@@ -34,3 +34,5 @@ export { default as Modal } from './Modal';
 
 export * from './Select';
 export { default as Select } from './Select';
+export * from './Textarea';
+export { default as Textarea } from './Textarea';

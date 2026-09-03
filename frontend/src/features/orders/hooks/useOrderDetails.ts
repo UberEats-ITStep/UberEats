@@ -11,16 +11,29 @@ export const useOrderDetails = (orderId?: string) => {
     isValidId ? null : 'This order link is not valid.',
   );
 
-  const reload = useCallback(async () => {
+  const [backgroundError, setBackgroundError] = useState<string | null>(null);
+
+  const reload = useCallback(async (isBackground = false) => {
     if (!isValidId) return;
-    setIsLoading(true);
-    setError(null);
+    if (!isBackground) {
+      setIsLoading(true);
+      setError(null);
+    }
+    setBackgroundError(null);
+    
     try {
       setOrder(await orderService.getOrderDetails(numericOrderId));
+      if (!isBackground) setError(null);
     } catch {
-      setError('We could not find this order or you do not have access to it.');
+      if (isBackground) {
+        setBackgroundError('Unable to refresh order status. We\'ll try again shortly.');
+      } else {
+        setError('We could not find this order or you do not have access to it.');
+      }
     } finally {
-      setIsLoading(false);
+      if (!isBackground) {
+        setIsLoading(false);
+      }
     }
   }, [isValidId, numericOrderId]);
 
@@ -46,5 +59,5 @@ export const useOrderDetails = (orderId?: string) => {
     return () => controller.abort();
   }, [isValidId, numericOrderId]);
 
-  return { order, isLoading, error, reload: () => void reload() };
+  return { order, isLoading, error, backgroundError, reload: (isBackground = false) => void reload(isBackground) };
 };

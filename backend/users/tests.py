@@ -1,3 +1,4 @@
+from decimal import Decimal
 import re
 from datetime import timedelta
 from typing import Any, cast
@@ -985,3 +986,77 @@ class ChangePasswordApiTests(APITestCase):
             throttled_response.status_code,
             status.HTTP_429_TOO_MANY_REQUESTS,
         )
+class ProfileCoordinatesTests(APITestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            username='client',
+            email='client@example.com',
+            password='TestPass123!',
+        )
+        self.profile_url = reverse('profile')
+
+    def test_profile_can_store_coordinates(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.patch(
+            self.profile_url,
+            {
+                'latitude': '50.620000',
+                'longitude': '26.250000'
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.latitude, Decimal('50.620000'))
+        self.assertEqual(self.user.profile.longitude, Decimal('26.250000'))
+        
+    def test_coordinates_are_optional(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.patch(
+            self.profile_url,
+            {
+                'phone_number': '+380501234567'
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.profile.refresh_from_db()
+        self.assertIsNone(self.user.profile.latitude)
+        
+    def test_invalid_latitude_rejected(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.patch(
+            self.profile_url,
+            {
+                'latitude': '100.000000',  # Invalid, max is 90
+                'longitude': '26.250000'
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        
+    def test_invalid_longitude_rejected(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.patch(
+            self.profile_url,
+            {
+                'latitude': '50.620000',
+                'longitude': '200.000000'  # Invalid, max is 180
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_incomplete_coordinates_rejected(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.patch(
+            self.profile_url,
+            {
+                'latitude': '50.620000'
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('longitude', response.data)

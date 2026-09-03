@@ -42,12 +42,19 @@ class OrderStatusView(generics.RetrieveUpdateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff or getattr(user, 'role', None) == 'ADMIN':
+
+        if user.is_staff or getattr(user, 'role', '').upper() == 'ADMIN':
             return Order.objects.all()
+
         return Order.objects.filter(client=user)
 
     def update(self, request, *args, **kwargs):
         user = request.user
-        if not user.is_staff and getattr(user, 'role', None) != 'ADMIN':
-            return Response({'detail': 'Only admins can update order status.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if not user.is_staff and getattr(user, 'role', '').upper() != 'ADMIN':
+            return Response(
+                {'detail': 'Only admins can update order status.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         return super().update(request, *args, **kwargs)

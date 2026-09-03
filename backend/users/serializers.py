@@ -52,7 +52,19 @@ class ProfileSerializer(serializers.ModelSerializer):
             'created_at',
             'phone_number',
             'address',
+            'latitude',
+            'longitude',
         ]
+
+    def validate(self, data):
+        lat = data.get('latitude', getattr(self.instance, 'latitude', None))
+        lng = data.get('longitude', getattr(self.instance, 'longitude', None))
+        if (lat is None) != (lng is None):
+            missing_field = 'longitude' if lng is None else 'latitude'
+            raise serializers.ValidationError({
+                missing_field: 'Latitude and longitude must both be set, or both be empty.'
+            })
+        return data
 
     def validate_email(self, value):
         email = value.lower()
@@ -143,6 +155,16 @@ class RegisterSerializer(serializers.ModelSerializer):
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
+    def validate(self, data):
+        lat = data.get('latitude', getattr(self.instance, 'latitude', None))
+        lng = data.get('longitude', getattr(self.instance, 'longitude', None))
+        if (lat is None) != (lng is None):
+            missing_field = 'longitude' if lng is None else 'latitude'
+            raise serializers.ValidationError({
+                missing_field: 'Latitude and longitude must both be set, or both be empty.'
+            })
+        return data
+
     def validate_email(self, value):
         return value.lower()
 
@@ -155,6 +177,16 @@ class ResetPasswordSerializer(serializers.Serializer):
     )
     new_password = serializers.CharField(write_only=True, trim_whitespace=False)
     confirm_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate(self, data):
+        lat = data.get('latitude', getattr(self.instance, 'latitude', None))
+        lng = data.get('longitude', getattr(self.instance, 'longitude', None))
+        if (lat is None) != (lng is None):
+            missing_field = 'longitude' if lng is None else 'latitude'
+            raise serializers.ValidationError({
+                missing_field: 'Latitude and longitude must both be set, or both be empty.'
+            })
+        return data
 
     def validate_email(self, value):
         return value.lower()

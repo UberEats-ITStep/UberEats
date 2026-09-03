@@ -7,12 +7,13 @@ interface OrderStatusBadgeProps {
 }
 
 const statusVariants: Record<OrderStatus, BadgeVariant> = {
-    Pending: 'warning',
-    Preparing: 'warning',
-    Ready: 'info',
-    Delivering: 'info',
-    Completed: 'success',
-    Cancelled: 'error',
+    PENDING: 'warning',
+    ACCEPTED: 'warning',
+    PREPARING: 'warning',
+    READY: 'info',
+    DELIVERING: 'info',
+    COMPLETED: 'success',
+    CANCELLED: 'error',
 };
 
 const OrderStatusBadge: FC<OrderStatusBadgeProps> = ({ status }) => (
