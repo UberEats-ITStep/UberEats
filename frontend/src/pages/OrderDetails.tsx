@@ -32,8 +32,8 @@ const OrderDetails: FC = () => {
     );
   }
 
-  const isDelivering = order.status === 'Delivering';
-  const isCompleted = order.status === 'Completed' || order.status === 'Cancelled';
+  const isDelivering = order.status === 'DELIVERING';
+  const isCompleted = order.status === 'COMPLETED' || order.status === 'CANCELLED';
 
   return (
     <SectionContainer width="page" padding="lg" className="pb-16 pt-10">

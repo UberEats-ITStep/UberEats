@@ -6,6 +6,8 @@ import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import VerifyEmail from '../pages/VerifyEmail';
+import ForgotPassword from '../pages/ForgotPassword';
+import ResetPassword from '../pages/ResetPassword';
 import NotFound from '../pages/NotFound';
 import OrderHistory from '../pages/OrderHistory';
 import OrderDetails from '../pages/OrderDetails';
@@ -59,6 +61,8 @@ const AnimatedRoutes: React.FC = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>

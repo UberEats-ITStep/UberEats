@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Navbar, Footer } from '../components/layout';
 import CartDrawer from '../features/cart/components/CartDrawer';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 
 const MainLayout: FC = () => {
   const location = useLocation();
@@ -18,7 +19,9 @@ const MainLayout: FC = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background font-sans text-text-primary">
       {showNavbar && <Navbar />}
-      <CartDrawer />
+      <ErrorBoundary fallback={(error) => <div className="fixed top-0 right-0 p-4 bg-white z-50 text-red-500 font-bold">Cart Crashed: {error.message}</div>}>
+        <CartDrawer />
+      </ErrorBoundary>
       <main className="flex-1 flex flex-col">
         <Outlet />
       </main>
