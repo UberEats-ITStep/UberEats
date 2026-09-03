@@ -1,8 +1,6 @@
-from decimal import Decimal
 from django.db import transaction
 from rest_framework import serializers
 
-from cart.models import Cart
 from restaurants.models import MenuItem
 from users.models import DeliveryAddress
 
@@ -17,12 +15,16 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = ['id', 'menu_item', 'menu_item_name', 'quantity', 'price', 'subtotal']
 
+    def get_menu_item_name(self, obj):
+        # Prefer the snapshot stored at checkout; fall back to the live name for existing records
+        if getattr(obj, 'menu_item_name_snapshot', None):
+            return obj.menu_item_name_snapshot
+        if getattr(obj, 'menu_item', None):
+            return obj.menu_item.name
+        return ''
+
     def get_subtotal(self, obj):
         return f'{obj.price * obj.quantity:.2f}'
-
-    def get_menu_item_name(self, obj):
-        return obj.menu_item_name_snapshot or obj.menu_item.name
-
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
@@ -61,7 +63,12 @@ class OrderSerializer(serializers.ModelSerializer):
         return review.id if review else None
 
     def get_restaurant_name(self, obj):
-        return obj.restaurant_name_snapshot or obj.restaurant.name
+        # Prefer the snapshot stored at checkout; fall back to the live restaurant name for existing records
+        if getattr(obj, 'restaurant_name_snapshot', None):
+            return obj.restaurant_name_snapshot
+        if getattr(obj, 'restaurant', None):
+            return obj.restaurant.name
+        return ''
 
 
 class CheckoutSerializer(serializers.Serializer):
@@ -203,78 +210,67 @@ class CheckoutSerializer(serializers.Serializer):
     @transaction.atomic
     def create(self, validated_data):
         user = self.context['request'].user
-
-        # Ensure cart exists
-        cart = getattr(user, 'cart', None)
-        if cart is None:
-            cart, _ = Cart.objects.get_or_create(user=user)
+        cart = user.cart
 
         delivery_address = validated_data.pop('delivery_address', None)
         validated_data.pop('delivery_address_id', None)
 
-        cart_items = list(cart.items.select_related('menu_item').all())
+        cart_items = cart.items.select_related('menu_item').all()
+        restaurant = cart_items[0].menu_item.restaurant
 
-        # Determine restaurant from cart items (validated to be single restaurant)
-        restaurant = None
-        if cart_items:
-            restaurant = cart_items[0].menu_item.restaurant
-
-        # Snapshot delivery details
-        if delivery_address:
-            street = delivery_address.street
-            building = delivery_address.building
-            apartment = delivery_address.apartment
-            entrance = delivery_address.entrance
-            floor = delivery_address.floor
-            delivery_notes = delivery_address.delivery_notes
-            contact_phone = delivery_address.contact_phone
-            delivery_latitude = delivery_address.latitude
-            delivery_longitude = delivery_address.longitude
+        if delivery_address is not None:
+            order = Order.objects.create(
+                client=user,
+                restaurant=restaurant,
+                street=delivery_address.street,
+                building=delivery_address.building,
+                apartment=delivery_address.apartment,
+                entrance=delivery_address.entrance,
+                floor=delivery_address.floor,
+                delivery_notes=delivery_address.delivery_notes,
+                contact_phone=delivery_address.contact_phone,
+                delivery_latitude=delivery_address.latitude,
+                delivery_longitude=delivery_address.longitude,
+                restaurant_name_snapshot=restaurant.name,
+            )
         else:
-            street = validated_data.get('street', '')
-            building = validated_data.get('building', '')
-            apartment = validated_data.get('apartment', '')
-            entrance = validated_data.get('entrance', '')
-            floor = validated_data.get('floor', None)
-            delivery_notes = validated_data.get('delivery_notes', '')
-            contact_phone = validated_data.get('contact_phone', '')
-            delivery_latitude = validated_data.get('delivery_latitude', None)
-            delivery_longitude = validated_data.get('delivery_longitude', None)
-
-        # Calculate total price using Decimal
-        total_price = Decimal('0.00')
-        for item in cart_items:
-            price = Decimal(str(item.menu_item.price))
-            total_price += price * item.quantity
-
-        order = Order.objects.create(
-            client=user,
-            restaurant=restaurant,
-            total_price=total_price,
-            street=street,
-            building=building,
-            apartment=apartment or '',
-            entrance=entrance or '',
-            floor=floor,
-            delivery_notes=delivery_notes or '',
-            contact_phone=contact_phone or '',
-            delivery_latitude=delivery_latitude,
-            delivery_longitude=delivery_longitude,
-            restaurant_name_snapshot=restaurant.name,
-        )
-
-        # Create order items
-        for item in cart_items:
-            OrderItem.objects.create(
-                order=order,
-                menu_item=item.menu_item,
-                quantity=item.quantity,
-                price=item.menu_item.price,
-                menu_item_name_snapshot=item.menu_item.name,
+            order = Order.objects.create(
+                client=user,
+                restaurant=restaurant,
+                street=validated_data['street'],
+                building=validated_data['building'],
+                apartment=validated_data.get('apartment', ''),
+                entrance=validated_data.get('entrance', ''),
+                floor=validated_data.get('floor'),
+                delivery_notes=validated_data.get('delivery_notes', ''),
+                contact_phone=validated_data.get('contact_phone', ''),
+                delivery_latitude=validated_data.get('delivery_latitude'),
+                delivery_longitude=validated_data.get('delivery_longitude'),
                 restaurant_name_snapshot=restaurant.name,
             )
 
-        # Clear cart
+        total_price = 0
+        order_items_to_create = []
+
+        for item in cart_items:
+            total_price += item.menu_item.price * item.quantity
+            order_items_to_create.append(
+                OrderItem(
+                    order=order,
+                    menu_item=item.menu_item,
+                    quantity=item.quantity,
+                    price=item.menu_item.price,
+                    menu_item_name_snapshot=item.menu_item.name,
+                    restaurant_name_snapshot=restaurant.name,
+                )
+            )
+
+        OrderItem.objects.bulk_create(
+            order_items_to_create
+        )
+
+        order.total_price = total_price
+        order.save(update_fields=['total_price'])
         cart.items.all().delete()
 
         return order
@@ -284,14 +280,3 @@ class OrderStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ['id', 'status']
-
-    def validate_status(self, value):
-        valid_statuses = {s[0] for s in Order.STATUS_CHOICES}
-        if value not in valid_statuses:
-            raise serializers.ValidationError('Invalid order status.')
-        return value
-
-    def update(self, instance, validated_data):
-        instance.status = validated_data.get('status', instance.status)
-        instance.save()
-        return instance

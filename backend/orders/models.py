@@ -71,6 +71,7 @@ class Order(models.Model):
     delivery_notes = models.TextField(max_length=500, blank=True, default='')
     contact_phone = models.CharField(max_length=20, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
+    # Snapshot of restaurant name at the time of order creation
     restaurant_name_snapshot = models.CharField(max_length=255, blank=True, default='')
 
     class Meta:
@@ -117,7 +118,9 @@ class OrderItem(models.Model):
         max_digits=10,
         decimal_places=2,
     )
+    # Snapshot of menu item name at the time of purchase
     menu_item_name_snapshot = models.CharField(max_length=255, blank=True, default='')
+    # Snapshot of restaurant name at the time of purchase
     restaurant_name_snapshot = models.CharField(max_length=255, blank=True, default='')
 
     @property
@@ -125,5 +128,6 @@ class OrderItem(models.Model):
         return self.price * self.quantity
 
     def __str__(self):
-        name = self.menu_item_name_snapshot or self.menu_item.name
+        # Prefer the snapshot name for historical safety; fall back to live relation
+        name = self.menu_item_name_snapshot or (self.menu_item.name if self.menu_item else '')
         return f'{name} x {self.quantity}'
