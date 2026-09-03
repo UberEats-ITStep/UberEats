@@ -30,9 +30,10 @@ export interface Order {
     contact_phone?: string;
     delivery_latitude?: string | null;
     delivery_longitude?: string | null;
-    restaurant: number | null; // Backend returns the ID
+    restaurant: number | null;
     restaurant_name?: string;
     restaurant_latitude?: string | null;
     restaurant_longitude?: string | null;
     items: OrderItem[];
+    review_id: number | null;
 }
