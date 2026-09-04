@@ -42,19 +42,43 @@ export const useHeroAnimation = () => {
       };
 
       // Intro animation for typing + blur effect
-      const playIntroAnimation = () => {
-        // Initial state for the characters
+      const playIntroAnimation = (targetScale: number) => {
+        // Initial state for the characters (untouched)
         gsap.set(openingChars, { autoAlpha: 0, filter: 'blur(8px)' });
         gsap.set(detailChars, { autoAlpha: 0, filter: 'blur(8px)' });
 
+        // Initial state for the hero image
+        gsap.set(image, {
+          autoAlpha: 0,
+          filter: 'blur(14px)',
+          scale: targetScale * 1.06,
+          transformOrigin: '50% 50%',
+        });
+
         const introTl = gsap.timeline();
+
+        // Image optical de-blur and subtle settle
+        introTl.to(
+          image,
+          {
+            autoAlpha: 1,
+            filter: 'blur(0px)',
+            scale: targetScale,
+            duration: 1.3,
+            ease: 'power2.out',
+            clearProps: 'filter',
+          },
+          0,
+        );
+
+        // Text animation (100% untouched)
         introTl.to(openingChars, {
           autoAlpha: 1,
           filter: 'blur(0px)',
           stagger: 0.04,
           duration: 0.8,
           ease: 'power2.out',
-        })
+        }, 0)
         .to(detailChars, {
           autoAlpha: 1,
           filter: 'blur(0px)',
@@ -69,7 +93,7 @@ export const useHeroAnimation = () => {
       mm.add('(min-width: 768px) and (prefers-reduced-motion: no-preference)', () => {
         prepareScene(DESKTOP_INITIAL_CLIP, 1.12);
         
-        const introTl = playIntroAnimation();
+        const introTl = playIntroAnimation(1.12);
 
         const tl = gsap.timeline({
           defaults: { ease: 'none' },
@@ -79,6 +103,11 @@ export const useHeroAnimation = () => {
             end: 'bottom bottom',
             scrub: 0.5,
             invalidateOnRefresh: true,
+            onUpdate: (self) => {
+              if (self.progress > 0 && introTl.isActive()) {
+                introTl.progress(1);
+              }
+            },
           },
         });
 
@@ -101,7 +130,7 @@ export const useHeroAnimation = () => {
       mm.add('(max-width: 767px) and (prefers-reduced-motion: no-preference)', () => {
         prepareScene(MOBILE_INITIAL_CLIP, 1.08);
         
-        const introTl = playIntroAnimation();
+        const introTl = playIntroAnimation(1.08);
 
         const tl = gsap.timeline({
           defaults: { ease: 'none' },
@@ -111,6 +140,11 @@ export const useHeroAnimation = () => {
             end: 'bottom bottom',
             scrub: 0.35,
             invalidateOnRefresh: true,
+            onUpdate: (self) => {
+              if (self.progress > 0 && introTl.isActive()) {
+                introTl.progress(1);
+              }
+            },
           },
         });
 
@@ -131,7 +165,7 @@ export const useHeroAnimation = () => {
 
       mm.add('(prefers-reduced-motion: reduce)', () => {
         gsap.set(photo, { clipPath: 'inset(0% 0% 0% 0%)' });
-        gsap.set(image, { scale: 1 });
+        gsap.set(image, { scale: 1, autoAlpha: 1, filter: 'none' });
         gsap.set(shade, { autoAlpha: 0.5 });
         gsap.set([opening, openingDetail, eyebrow], { autoAlpha: 0 });
         gsap.set(finalCopy, { autoAlpha: 1, y: 0 });
