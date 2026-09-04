@@ -35,6 +35,19 @@ class Category(models.Model):
         return self.name
 
 
+class MenuTag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    slug = models.SlugField(max_length=50, unique=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Restaurant(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
@@ -196,6 +209,7 @@ class MenuItem(models.Model):
     is_vegetarian = models.BooleanField(default=False)
     is_vegan = models.BooleanField(default=False)
     calories = models.PositiveIntegerField(null=True, blank=True)
+    tags = models.ManyToManyField(MenuTag, related_name="menu_items", blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

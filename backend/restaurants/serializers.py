@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from .models import (
     Category, Cuisine, DEFAULT_MENU_ITEM_IMAGE_URL,
-    DEFAULT_RESTAURANT_IMAGE_URL, MenuItem, OpeningHours, Restaurant,
+    DEFAULT_RESTAURANT_IMAGE_URL, MenuItem, MenuTag, OpeningHours, Restaurant,
 )
 
 
@@ -37,6 +37,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField(read_only=True)
+    tags = serializers.SlugRelatedField(many=True, slug_field="name", queryset=MenuTag.objects.all(), required=False)
 
     class Meta:
         model = MenuItem
@@ -54,6 +55,7 @@ class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
             "is_vegetarian",
             "is_vegan",
             "calories",
+            "tags",
             "slug",
         )
         read_only_fields = ("slug",)
@@ -96,6 +98,7 @@ class MenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
 class RestaurantMenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     image_url = serializers.SerializerMethodField(read_only=True)
+    tags = serializers.SlugRelatedField(many=True, slug_field="name", queryset=MenuTag.objects.all(), required=False)
 
     class Meta:
         model = MenuItem
@@ -113,6 +116,7 @@ class RestaurantMenuItemSerializer(ImageURLMixin, serializers.ModelSerializer):
             "is_vegetarian",
             "is_vegan",
             "calories",
+            "tags",
             "slug",
         )
 

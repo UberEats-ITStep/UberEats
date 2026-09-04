@@ -38,7 +38,7 @@ class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
             return queryset.prefetch_related(
                 Prefetch(
                     "menu_items",
-                    queryset=MenuItem.objects.order_by("id").select_related("category"),
+                    queryset=MenuItem.objects.order_by("id").select_related("category").prefetch_related("tags"),
                 )
             )
 

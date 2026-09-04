@@ -253,7 +253,7 @@ class RestaurantApiTests(APITestCase):
     def test_detail_contains_complete_schedule_and_menu_metadata(self):
         restaurant, category, available, unavailable = self.create_graph()
 
-        with self.assertNumQueries(3):
+        with self.assertNumQueries(4):
             response = self.client.get(reverse("restaurant-detail", args=[restaurant.pk]))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
