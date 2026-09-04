@@ -12,14 +12,17 @@ const MainLayout: FC = () => {
   // since the EditorialHero provides its own top navigation.
   const showNavbar = !(location.pathname === '/' && !isAuthenticated && !isLoading);
 
+  // Hide the footer on authentication pages to maintain a clean, focused user experience.
+  const isAuthPage = ['/login', '/register', '/verify-email'].includes(location.pathname);
+
   return (
     <div className="flex min-h-screen flex-col bg-background font-sans text-text-primary">
       {showNavbar && <Navbar />}
       <CartDrawer />
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col">
         <Outlet />
       </main>
-      <Footer />
+      {!isAuthPage && <Footer />}
     </div>
   );
 };

@@ -6,7 +6,7 @@ import { useReviews } from '../hooks/useReviews';
 import { useEligibleReviewOrder } from '../hooks/useEligibleReviewOrder';
 import ReviewCard from './ReviewCard';
 import ReviewModal from './ReviewModal';
-import { Button, EmptyState, Alert, Modal } from '../../../components/common';
+import { Button, EmptyState, Alert, Modal, LoadingState } from '../../../components/common';
 
 export interface ReviewListProps {
   restaurant: Restaurant;
@@ -17,9 +17,9 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
   const { profile, isAuthenticated } = useAuth();
   const userId = profile?.id;
 
-  const { reviews, addReview, updateReview, deleteReview } = useReviews(restaurant.id);
+  const { reviews, isLoading, error, hasMore, isLoadingMore, addReview, updateReview, deleteReview, loadMore, reload } = useReviews(restaurant.id);
   const { eligibleOrderId } = useEligibleReviewOrder(restaurant.id, userId, reviews);
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [reviewToDelete, setReviewToDelete] = useState<Review | null>(null);
@@ -75,7 +75,7 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
     }
   };
 
-  const hasReviews = reviews.length > 0;
+  const hasReviews = Array.isArray(reviews) && reviews.length > 0;
 
   return (
     <div className="py-16">
@@ -118,8 +118,13 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
         </div>
       )}
 
-      {/* Review List or Empty State */}
-      {!hasReviews ? (
+      {isLoading && <LoadingState message="Loading reviews..." />}
+
+      {!isLoading && error && (
+        <Alert variant="error" title="Reviews couldn't be loaded right now." message={error} onRetry={reload} />
+      )}
+
+      {!isLoading && !error && !hasReviews && (
         <EmptyState
           title="No feedback yet"
           description="Be the first to share your experience."
@@ -129,9 +134,11 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
             </svg>
           }
         />
-      ) : (
+      )}
+
+      {!isLoading && !error && hasReviews && (
         <div className="grid grid-cols-1 gap-6">
-          {reviews.map(review => (
+          {(reviews || []).map(review => (
             <ReviewCard
               key={review.id}
               review={review}
@@ -143,7 +150,18 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
         </div>
       )}
 
-      {/* Review Form Modal */}
+      {!isLoading && !error && hasMore && (
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => void loadMore()}
+            disabled={isLoadingMore}
+            className="text-sm font-medium text-text-muted hover:text-text-primary transition-base underline underline-offset-4 disabled:opacity-50"
+          >
+            {isLoadingMore ? 'Loading more...' : 'Load more reviews'}
+          </button>
+        </div>
+      )}
+
       <ReviewModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -166,7 +184,7 @@ export const ReviewList: FC<ReviewListProps> = ({ restaurant, onReviewChange }) 
         }
       >
         <p className="text-text-primary text-lg font-serif italic">
-          Are you sure you want to remove your feedback? This action is permanent.
+          Are you sure you want to remove your feedback? Your review is important!
         </p>
       </Modal>
     </div>

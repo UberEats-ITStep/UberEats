@@ -12,8 +12,8 @@ class ReviewViewSet(viewsets.ModelViewSet):
     filterset_fields = ["restaurant"]
 
     def get_queryset(self):
-        return Review.objects.all().select_related('client', 'restaurant', 'order')
-
+        return Review.objects.all().select_related('client', 'client__profile', 'restaurant', 'order')
+    
     @transaction.atomic
     def perform_create(self, serializer):
         super().perform_create(serializer)

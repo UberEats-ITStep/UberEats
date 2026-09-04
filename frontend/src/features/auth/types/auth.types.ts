@@ -5,6 +5,7 @@ export interface Profile {
   role: string;
   phone_number: string | null;
   address: string | null;
+  avatar: string;
 }
 
 export interface AuthTokens {

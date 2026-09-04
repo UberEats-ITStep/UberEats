@@ -1,7 +1,7 @@
 from django.conf import settings
-from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 
 from restaurants.models import MenuItem, Restaurant
 
@@ -71,7 +71,25 @@ class Order(models.Model):
     delivery_notes = models.TextField(max_length=500, blank=True, default='')
     contact_phone = models.CharField(max_length=20, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
+    # Snapshot of restaurant name at the time of order creation
+    restaurant_name_snapshot = models.CharField(max_length=255, blank=True, default='')
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        delivery_latitude__isnull=True,
+                        delivery_longitude__isnull=True,
+                    )
+                    | models.Q(
+                        delivery_latitude__isnull=False,
+                        delivery_longitude__isnull=False,
+                    )
+                ),
+                name='order_delivery_coordinates_together',
+            ),
+        ]
     def clean(self):
         super().clean()
         if (self.delivery_latitude is None) != (self.delivery_longitude is None):
@@ -100,10 +118,16 @@ class OrderItem(models.Model):
         max_digits=10,
         decimal_places=2,
     )
+    # Snapshot of menu item name at the time of purchase
+    menu_item_name_snapshot = models.CharField(max_length=255, blank=True, default='')
+    # Snapshot of restaurant name at the time of purchase
+    restaurant_name_snapshot = models.CharField(max_length=255, blank=True, default='')
 
     @property
     def line_total(self):
         return self.price * self.quantity
 
     def __str__(self):
-        return f'{self.menu_item.name} x {self.quantity}'
+        # Prefer the snapshot name for historical safety; fall back to live relation
+        name = self.menu_item_name_snapshot or (self.menu_item.name if self.menu_item else '')
+        return f'{name} x {self.quantity}'

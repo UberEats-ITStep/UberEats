@@ -8,7 +8,7 @@ export interface RestaurantStatsProps {
 const RestaurantStats: FC<RestaurantStatsProps> = ({ restaurant }) => (
   <section
     aria-label="Restaurant information"
-    className="relative z-10 grid gap-6 border-b border-border-default bg-surface py-6 px-6 sm:px-12 sm:grid-cols-3"
+    className="relative z-10 grid gap-6 border-b border-border-default bg-transparent py-8 sm:grid-cols-3"
   >
     <div>
       <p className="text-xs tracking-widest uppercase text-text-muted mb-2">Rating</p>
