@@ -67,6 +67,12 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     clearSession();
   };
 
+  const refreshProfile = async () => {
+    const currentProfile = await authApi.getProfile();
+    setProfile(currentProfile);
+    return currentProfile;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -77,6 +83,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         loginWithTokens,
         register,
         logout,
+        refreshProfile,
       }}
     >
       {children}

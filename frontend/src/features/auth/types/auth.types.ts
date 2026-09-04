@@ -6,7 +6,20 @@ export interface Profile {
   phone_number: string | null;
   address: string | null;
   avatar: string;
+  default_address: DeliveryAddress | null;
 }
+
+export interface AvatarOption { id: string; label: string; }
+
+export interface DeliveryAddress {
+  id: number; label: string; formatted_address: string; street: string; building: string;
+  apartment: string; entrance: string; floor: number | null; delivery_notes: string;
+  contact_phone: string; latitude: string | null; longitude: string | null;
+  is_default: boolean; created_at: string; updated_at: string;
+}
+
+export type DeliveryAddressInput = Omit<DeliveryAddress, 'id' | 'is_default' | 'created_at' | 'updated_at'>;
+export type ProfileUpdate = Pick<Profile, 'phone_number' | 'avatar'>;
 
 export interface AuthTokens {
   access: string;
