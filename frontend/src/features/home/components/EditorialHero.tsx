@@ -1,219 +1,134 @@
-import { useRef, type FC } from 'react';
-import { Link } from 'react-router-dom';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { useGSAP } from '@gsap/react';
+import type { FC } from "react";
+import { Link } from "react-router-dom";
+import { useHeroAnimation } from "../hooks/useHeroAnimation";
+import "./EditorialHero.css";
 
-// Register ScrollTrigger once
-if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger);
-}
+const HERO_IMAGE =
+  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2000&auto=format&fit=crop";
 
-export const EditorialHero: FC = () => {
-  const containerRef = useRef<HTMLDivElement>(null);
+const splitText = (text: string, className: string) => {
+  return text.split(" ").map((word, wordIndex, wordsArr) => (
+    <span key={wordIndex} className="inline-block whitespace-nowrap">
+      {word.split("").map((char, charIndex) => (
+        <span key={charIndex} className={`inline-block ${className}`}>
+          {char}
+        </span>
+      ))}
+      {wordIndex !== wordsArr.length - 1 && (
+        <span className={`inline-block ${className}`}>&nbsp;</span>
+      )}
+    </span>
+  ));
+};
 
-  useGSAP(() => {
-    // Only execute if ref is populated
-    if (!containerRef.current) return;
-
-    // Use matchMedia to handle prefers-reduced-motion
-    const mm = gsap.matchMedia(containerRef);
-
-    mm.add("(prefers-reduced-motion: no-preference)", () => {
-      // 1. Initial Load Timeline
-      const tl = gsap.timeline({ defaults: { ease: 'cubic-bezier(.2, .75, .2, 1)', duration: 0.7 } });
-      
-      tl.fromTo('.hero-headline-line', 
-        { y: 40, opacity: 0 },
-        { y: 0, opacity: 1, stagger: 0.15 }
-      )
-      .fromTo('.hero-copy',
-        { y: 20, opacity: 0 },
-        { y: 0, opacity: 1 },
-        "-=0.4"
-      )
-      .fromTo('.hero-ctas',
-        { y: 20, opacity: 0 },
-        { y: 0, opacity: 1 },
-        "-=0.5"
-      )
-      .fromTo('.hero-art',
-        { opacity: 0, scale: 0.95, rotation: -2 },
-        { opacity: 1, scale: 1, rotation: 0, stagger: 0.1, duration: 1 },
-        "-=0.6"
-      );
-
-      // 2. Subtle Scroll Parallax for Artwork
-      gsap.to('.hero-art-parallax', {
-        y: -40,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: '.hero-section',
-          start: 'top top',
-          end: 'bottom top',
-          scrub: true,
-        }
-      });
-
-      // 3. Reveal "How it works" steps on scroll
-      gsap.fromTo('.how-step',
-        { y: 30, opacity: 0 },
-        {
-          y: 0, 
-          opacity: 1, 
-          stagger: 0.15,
-          duration: 0.6,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: '.how-it-works-section',
-            start: 'top 85%',
-          }
-        }
-      );
-    });
-
-    // Fallback for reduced motion
-    mm.add("(prefers-reduced-motion: reduce)", () => {
-      gsap.set(['.hero-headline-line', '.hero-copy', '.hero-ctas', '.hero-art', '.how-step'], { 
-        opacity: 1, y: 0, scale: 1, rotation: 0 
-      });
-    });
-
-    return () => {
-      // Clean up matchMedia on unmount
-      mm.revert();
-    };
-  }, { scope: containerRef });
+const EditorialHero: FC = () => {
+  const { containerRef, scrollToRestaurants } = useHeroAnimation();
 
   return (
-    <div ref={containerRef} className="w-full bg-background pt-6 pb-20 border-b border-border-default overflow-hidden">
-      
-      {/* Top Navigation Strip */}
-      <div className="container-page flex justify-between items-center mb-16 relative z-20">
-        <div className="font-serif italic font-bold text-2xl tracking-tight text-text-primary">
-          BiteUp
-        </div>
-        <Link 
-          to="/login" 
-          className="text-sm font-medium tracking-widest uppercase text-text-secondary hover:text-text-primary transition-colors underline-offset-4 hover:underline"
+    <section
+      ref={containerRef}
+      className="editorial-hero relative w-full bg-background"
+    >
+      <div
+        data-hero="stage"
+        className="editorial-hero__stage sticky top-0 w-full overflow-hidden"
+      >
+        <div
+          data-hero="photo"
+          className="editorial-hero__photo absolute inset-0 overflow-hidden"
         >
-          Sign in
-        </Link>
-      </div>
+          <img
+            data-hero="image"
+            src={HERO_IMAGE}
+            alt="A carefully prepared restaurant dish"
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="eager"
+            fetchPriority="high"
+            draggable={false}
+          />
+          <div
+            data-hero="shade"
+            aria-hidden="true"
+            className="absolute inset-0 bg-black"
+          />
+        </div>
 
-      {/* Main Hero Section */}
-      <section className="hero-section container-page relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-16 min-h-[60vh]">
-        
-        {/* Left Column: Copy & CTA */}
-        <div className="max-w-2xl lg:w-1/2">
-          
-          <h1 className="text-5xl lg:text-7xl xl:text-8xl font-bold tracking-tight text-text-primary mb-8 overflow-hidden">
-            <div className="hero-headline-line">Your next</div>
-            <div className="hero-headline-line font-serif italic font-normal text-text-secondary">meal,</div>
-            <div className="hero-headline-line">made easy.</div>
+        <div className="pointer-events-none absolute inset-0 z-10">
+          <p
+            data-hero="eyebrow"
+            className="absolute left-5 top-24 text-[10px] font-semibold uppercase tracking-[0.26em] text-text-primary sm:left-8 sm:top-32 lg:left-12"
+          >
+            BiteUp / 01
+          </p>
+
+          <h1
+            data-hero="opening"
+            className="editorial-hero__opening absolute font-serif text-text-primary"
+          >
+            <span className="block whitespace-nowrap mb-2 md:mb-4">
+              {splitText("Food worth", "opening-char")}
+            </span>
+            <span className="block whitespace-nowrap italic">
+              {splitText("remembering.", "opening-char")}
+            </span>
           </h1>
 
-          <div className="hero-copy mb-10">
-            <p className="text-lg text-text-secondary max-w-lg leading-relaxed mb-6">
-              Discover local restaurants, browse exquisite menus, build your perfect order, and make dinner effortless.
-            </p>
-            
-            <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-medium tracking-widest uppercase text-text-muted">
-              <span>✓ Local kitchens</span>
-              <span>✓ Menus in one place</span>
-              <span>✓ Simple ordering</span>
-            </div>
-          </div>
+          <p
+            data-hero="opening-detail"
+            className="editorial-hero__opening-detail absolute hidden text-right text-[10px] font-semibold uppercase leading-relaxed tracking-[0.18em] text-text-secondary md:block"
+          >
+            <span className="block whitespace-nowrap">
+              {splitText("Restaurants selected for", "detail-char")}
+            </span>
+            <span className="block whitespace-nowrap">
+              {splitText("every kind of evening", "detail-char")}
+            </span>
+          </p>
 
-          <div className="hero-ctas flex flex-wrap items-center gap-4">
-            <a 
-              href="#restaurants" 
-              className="px-8 py-4 bg-primary text-surface font-medium text-sm tracking-wide transition-all duration-300 hover:bg-primary-hover hover:-translate-y-0.5"
-            >
-              Explore restaurants
-            </a>
-            <Link 
-              to="/login" 
-              className="px-8 py-4 bg-surface border border-border-default text-text-primary font-medium text-sm tracking-wide transition-all duration-300 hover:border-text-primary hover:-translate-y-0.5"
-            >
-              Sign in
-            </Link>
+          <div
+            data-hero="final-copy"
+            className="absolute inset-x-5 top-1/2 -translate-y-1/2 text-center text-white sm:inset-x-8"
+          >
+            <p className="mb-5 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/70">
+              The table is yours
+            </p>
+            <h2 className="font-serif text-[clamp(4rem,10vw,10.5rem)] leading-[0.8] tracking-[-0.04em]">
+              Taste it
+              <br />
+              <span className="italic">tonight.</span>
+            </h2>
           </div>
         </div>
 
-        {/* Right Column: Editorial Artwork */}
-        <div className="lg:w-1/2 h-80 lg:h-[500px] relative mt-12 lg:mt-0 opacity-100 flex items-center justify-center">
-          <div className="hero-art-parallax relative w-full h-full">
-            {/* Abstract background grid */}
-            <div className="hero-art absolute inset-0 editorial-grid opacity-10"></div>
-            
-            {/* Minimalist Shapes / Plates */}
-            <div className="hero-art absolute top-10 right-10 w-64 h-64 rounded-full border border-border-default flex items-center justify-center">
-               <div className="w-48 h-48 rounded-full border border-border-subtle bg-surface shadow-subtle flex items-center justify-center">
-                 <div className="w-32 h-32 rounded-full bg-background border border-border-default/50"></div>
-               </div>
-            </div>
-            
-            {/* Minimal Menu Card */}
-            <div className="hero-art absolute bottom-12 left-10 w-56 p-6 bg-surface border border-border-default shadow-elevated transform -rotate-3 transition-transform duration-500 hover:rotate-0 hover:-translate-y-2 hover:shadow-floating">
-               <div className="w-12 h-1 bg-text-primary mb-4"></div>
-               <div className="w-3/4 h-2 bg-muted mb-2"></div>
-               <div className="w-1/2 h-2 bg-muted mb-6"></div>
-               
-               <div className="w-full h-1 bg-border-default mb-2"></div>
-               <div className="flex justify-between w-full mb-1">
-                 <div className="w-2/3 h-1.5 bg-muted"></div>
-                 <div className="w-1/4 h-1.5 bg-text-primary"></div>
-               </div>
-               <div className="flex justify-between w-full">
-                 <div className="w-1/2 h-1.5 bg-muted"></div>
-                 <div className="w-1/4 h-1.5 bg-text-primary"></div>
-               </div>
-            </div>
+        <button
+          data-hero="cta"
+          type="button"
+          onClick={scrollToRestaurants}
+          className="absolute bottom-7 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-3 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.22em] text-white focus:outline-none focus:ring-1 focus:ring-white focus:ring-offset-2 focus:ring-offset-black sm:bottom-10"
+        >
+          Explore restaurants
+          <span aria-hidden="true" className="h-8 w-px bg-white/60" />
+        </button>
 
-            {/* Stamp / Badge */}
-            <div className="hero-art absolute top-1/2 left-1/4 w-20 h-20 bg-primary rounded-full text-surface flex flex-col items-center justify-center transform -translate-y-1/2 translate-x-1/4 rotate-12">
-               <span className="text-[10px] uppercase tracking-widest font-medium">Est.</span>
-               <span className="font-serif italic text-lg">2026</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works Section */}
-      <section className="how-it-works-section container-page mt-32 relative z-10">
-        <h2 className="text-xs font-medium tracking-widest uppercase text-text-muted mb-12 border-b border-border-default pb-4">
-          How it works
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-24">
-          <div className="how-step">
-            <div className="text-4xl font-serif italic text-text-muted mb-4">01.</div>
-            <h3 className="text-xl font-medium text-text-primary mb-3">Pick a kitchen</h3>
-            <p className="text-text-secondary leading-relaxed text-sm">
-              Explore curated restaurants in your area, ranging from hidden gems to renowned local favorites.
-            </p>
-          </div>
-          
-          <div className="how-step">
-            <div className="text-4xl font-serif italic text-text-muted mb-4">02.</div>
-            <h3 className="text-xl font-medium text-text-primary mb-3">Choose your dish</h3>
-            <p className="text-text-secondary leading-relaxed text-sm">
-              Browse elegant menus, customize your perfect meal, and securely place your order in seconds.
-            </p>
-          </div>
-          
-          <div className="how-step">
-            <div className="text-4xl font-serif italic text-text-muted mb-4">03.</div>
-            <h3 className="text-xl font-medium text-text-primary mb-3">Enjoy your evening</h3>
-            <p className="text-text-secondary leading-relaxed text-sm">
-              Sit back and relax. We coordinate the preparation and delivery so you can savor every bite.
-            </p>
-          </div>
-        </div>
-      </section>
-      
-    </div>
+        <nav
+          data-hero="nav"
+          className="absolute left-0 top-0 z-30 flex w-full items-center justify-between px-5 py-6 sm:px-8 sm:py-7 lg:px-12"
+        >
+          <Link
+            to="/"
+            className="font-serif text-3xl italic leading-none tracking-tight focus:outline-none focus:ring-1 focus:ring-current"
+          >
+            BiteUp.
+          </Link>
+          <Link
+            to="/login"
+            className="border border-current px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] transition-opacity hover:opacity-70 focus:outline-none focus:ring-1 focus:ring-current focus:ring-offset-2"
+          >
+            Sign in
+          </Link>
+        </nav>
+      </div>
+    </section>
   );
 };
 

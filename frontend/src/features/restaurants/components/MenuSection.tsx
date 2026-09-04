@@ -1,7 +1,9 @@
 import type { FC } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { MenuCategory, MenuItem } from '../types/restaurant.types';
 import MenuItemCard from './MenuItemCard';
 import { EmptyState } from '../../../components/common';
+import { useEffect } from 'react';
 
 export interface MenuSectionProps {
   categories: MenuCategory[];
@@ -10,6 +12,23 @@ export interface MenuSectionProps {
 }
 
 const MenuSection: FC<MenuSectionProps> = ({ categories, onAddToCart, isLoading }) => {
+  const location = useLocation();
+  const highlightedItemId = location.hash ? location.hash.replace('#item-', '') : null;
+
+  useEffect(() => {
+    if (location.hash) {
+      // Small delay to ensure render is complete before scrolling
+      setTimeout(() => {
+        const element = document.getElementById(location.hash.substring(1));
+        if (element) {
+          // Scroll with a small offset for the sticky header
+          const y = element.getBoundingClientRect().top + window.scrollY - 100;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 100);
+    }
+  }, [location.hash, categories]);
+
   const menuItemCount = categories.reduce(
     (total, category) => total + category.menu_items.length,
     0,
@@ -34,24 +53,30 @@ const MenuSection: FC<MenuSectionProps> = ({ categories, onAddToCart, isLoading 
           id={`category-${category.id}`}
           className="scroll-mt-24"
         >
-          <div className="mb-8 border-b border-text-primary pb-4 flex items-baseline justify-between gap-4">
+          <div className="mb-6 border-b-2 border-primary pb-4 flex items-baseline justify-between gap-4">
             <h2 className="text-3xl font-serif italic text-text-primary">
               {category.name}
             </h2>
-            <span className="text-sm tracking-widest uppercase font-medium text-text-muted">
+            <span className="text-[10px] tracking-widest uppercase font-bold text-text-muted">
               {category.menu_items.length}{' '}
               {category.menu_items.length === 1 ? 'item' : 'items'}
             </span>
           </div>
 
           {category.menu_items.length === 0 ? (
-            <div className="border border-border-default bg-surface p-8 text-center text-text-secondary font-serif italic">
+            <div className="py-8 text-text-secondary text-sm italic">
               Nothing is available in {category.name} right now.
             </div>
           ) : (
             <div className="grid gap-6 lg:grid-cols-2">
               {category.menu_items.map((item) => (
-                <MenuItemCard key={item.id} item={item} onAddToCart={onAddToCart} isLoading={isLoading} />
+                <MenuItemCard 
+                  key={item.id} 
+                  item={item} 
+                  onAddToCart={onAddToCart} 
+                  isLoading={isLoading}
+                  isHighlighted={highlightedItemId === item.id.toString()}
+                />
               ))}
             </div>
           )}

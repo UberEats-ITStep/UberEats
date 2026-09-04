@@ -1,4 +1,5 @@
 import { useEffect, type FC, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ export const Modal: FC<ModalProps> = ({ isOpen, onClose, title, children, footer
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
       <div 
         className="absolute inset-0 bg-primary/70 transition-opacity backdrop-blur-sm"
@@ -54,7 +55,8 @@ export const Modal: FC<ModalProps> = ({ isOpen, onClose, title, children, footer
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
