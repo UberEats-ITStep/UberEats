@@ -13,6 +13,7 @@ export interface AuthContextType {
   loginWithTokens: (access: string, refresh: string) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => void;
+  refreshProfile: () => Promise<Profile>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

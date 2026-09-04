@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -7,10 +7,10 @@ import { orderService } from '../features/orders/api/order.service';
 import { Button, Input, Textarea, SectionContainer, EmptyState, Alert, Card, FormField } from '../components/common';
 import OrderSummaryList, { type SummaryItem } from '../features/orders/components/OrderSummaryList';
 import OrderPlacementAnimation from '../features/orders/components/OrderPlacementAnimation';
+import LocationPicker, { type ResolvedLocation } from '../features/auth/components/LocationPicker';
+import { authApi } from '../features/auth/api/authApi';
+import type { DeliveryAddress } from '../features/auth/types/auth.types';
 import { formatPrice } from '../utils/currency';
-import Map, { NavigationControl } from 'react-map-gl/maplibre';
-import type { MapRef } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
 
 const Checkout: FC = () => {
   const { cart, cartTotal, itemCount, refreshCart } = useCart();
@@ -24,76 +24,23 @@ const Checkout: FC = () => {
   const [floor, setFloor] = useState<number | ''>('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [contactPhone, setContactPhone] = useState(profile?.phone_number || '');
+  const [savedAddresses, setSavedAddresses] = useState<DeliveryAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [coordinates, setCoordinates] = useState({ latitude: 50.62, longitude: 26.25 });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const maptilerKey = import.meta.env.VITE_MAPTILER_API_KEY;
-  const mapRef = useRef<MapRef>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  
-  // Default to Rivne city center
-  const [viewState, setViewState] = useState({
-    longitude: 26.250000,
-    latitude: 50.620000,
-    zoom: 14
-  });
-
-  const mapStyle = useMemo(() => {
-    return maptilerKey 
-      ? `https://api.maptiler.com/maps/basic-v2/style.json?key=${maptilerKey}`
-      : {
-          version: 8,
-          sources: {
-            osm: {
-              type: 'raster',
-              tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              attribution: '&copy; OpenStreetMap Contributors',
-            }
-          },
-          layers: [
-            {
-              id: 'osm',
-              type: 'raster',
-              source: 'osm',
-              paint: {
-                'raster-saturation': -1,
-                'raster-opacity': 0.8
-              }
-            }
-          ]
-        } as any;
-  }, [maptilerKey]);
-
-  const handleReverseGeocode = async () => {
-    if (!maptilerKey) {
-      alert("MapTiler API key is missing. Manual entry required.");
-      return;
-    }
-    
-    try {
-      const res = await fetch(`https://api.maptiler.com/geocoding/${viewState.longitude},${viewState.latitude}.json?key=${maptilerKey}`);
-      const data = await res.json();
-      
-      if (data.features && data.features.length > 0) {
-        const addressFeature = data.features.find((f: any) => f.place_type.includes('address')) || data.features[0];
-        
-        if (addressFeature.text) setStreet(addressFeature.text);
-        if (addressFeature.address) setBuilding(addressFeature.address);
-        
-        // Provide visual feedback and scroll to form
-        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        alert("Could not find an address for this exact location.");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Failed to reverse geocode location.");
-    }
-  };
+  const applyAddress = useCallback((address: DeliveryAddress) => {
+    setSelectedAddressId(address.id); setStreet(address.street); setBuilding(address.building);
+    setApartment(address.apartment); setEntrance(address.entrance); setFloor(address.floor ?? '');
+    setDeliveryNotes(address.delivery_notes); setContactPhone(address.contact_phone || profile?.phone_number || '');
+    if (address.latitude && address.longitude) setCoordinates({ latitude: Number(address.latitude), longitude: Number(address.longitude) });
+  }, [profile?.phone_number]);
+  useEffect(() => { authApi.getAddresses().then((items) => { setSavedAddresses(items); const preferred = items.find((item) => item.is_default) || items[0]; if (preferred) applyAddress(preferred); }).catch(() => undefined); }, [applyAddress]);
+  const resolveLocation = (location: ResolvedLocation) => { setSelectedAddressId(null); setStreet(location.street); setBuilding(location.building); setCoordinates({ latitude: location.latitude, longitude: location.longitude }); };
 
   if (isSubmitting || showSuccess) {
     return (
@@ -144,8 +91,8 @@ const Checkout: FC = () => {
         floor: floor === '' ? null : Number(floor),
         delivery_notes: deliveryNotes.trim(),
         contact_phone: contactPhone.trim(),
-        delivery_latitude: viewState.latitude.toFixed(6),
-        delivery_longitude: viewState.longitude.toFixed(6)
+        delivery_latitude: coordinates.latitude.toFixed(6),
+        delivery_longitude: coordinates.longitude.toFixed(6)
       });
       
       await refreshCart();
@@ -215,50 +162,17 @@ const Checkout: FC = () => {
               </div>
             )}
 
+            {savedAddresses.length > 0 && <div className="mb-8"><p className="text-caption">Deliver to</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{savedAddresses.map((address) => <button type="button" key={address.id} onClick={() => applyAddress(address)} className={`p-4 text-left border transition-base ${selectedAddressId === address.id ? 'border-2 border-primary bg-secondary' : 'border-border-default hover:border-text-muted'}`}><span className="flex items-center justify-between gap-2 font-bold"><span>{address.label}</span><span>{selectedAddressId === address.id ? '●' : '○'}</span></span><span className="mt-2 block text-sm text-text-secondary">{address.formatted_address}</span>{address.is_default && <span className="mt-2 block text-[10px] uppercase tracking-widest">Default address</span>}</button>)}</div><Link to="/profile" className="mt-3 inline-block text-sm font-medium underline underline-offset-4">+ Add new address</Link></div>}
+
             {/* Interactive Map Picker */}
             <div className="mb-8">
               <h3 className="text-lg font-bold text-text-primary mb-1">Pinpoint Location</h3>
               <p className="text-sm text-text-secondary mb-4">Drag the map to your location, then click "Confirm" to auto-fill your address.</p>
               
-              <div className="relative w-full h-[300px] sm:h-[400px] border border-border-default bg-muted shadow-subtle overflow-hidden group">
-                <Map
-                  ref={mapRef}
-                  {...viewState}
-                  onMove={evt => setViewState(evt.viewState)}
-                  mapStyle={mapStyle}
-                  attributionControl={false}
-                >
-                  <NavigationControl position="top-right" />
-                  
-                  {/* Minimalist Editorial Center Pin */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10 flex flex-col items-center transition-transform duration-100">
-                    <div className="w-8 h-8 bg-text-primary rounded-full flex items-center justify-center shadow-elevated border-4 border-surface">
-                      <div className="w-2 h-2 bg-surface rounded-full" />
-                    </div>
-                    <div className="w-1 h-5 bg-text-primary shadow-elevated" />
-                    <div className="w-2 h-2 bg-text-primary rounded-full -mt-1 opacity-40 shadow-elevated" />
-                  </div>
-                </Map>
-                
-                {/* Overlay Confirm Button */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
-                  <Button 
-                    type="button" 
-                    variant="primary" 
-                    size="md" 
-                    className="shadow-elevated px-8 whitespace-nowrap transition-transform hover:scale-105 active:scale-95"
-                    onClick={handleReverseGeocode}
-                  >
-                    Confirm Location
-                  </Button>
-                </div>
-              </div>
-              <p className="text-xs text-text-muted mt-2 text-right">
-                GPS: {viewState.latitude.toFixed(5)}, {viewState.longitude.toFixed(5)}
-              </p>
+              <LocationPicker initialAddress={[street, building].filter(Boolean).join(' ')} initialLatitude={coordinates.latitude} initialLongitude={coordinates.longitude} onResolve={resolveLocation} />
             </div>
 
-            <form ref={formRef} id="checkout-form" onSubmit={handleSubmit} className="space-y-6 border-t border-border-default pt-8">
+            <form id="checkout-form" onSubmit={handleSubmit} className="space-y-6 border-t border-border-default pt-8">
               <h3 className="text-lg font-bold text-text-primary mb-1">Delivery Address</h3>
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

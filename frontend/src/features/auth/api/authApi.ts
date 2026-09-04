@@ -8,6 +8,7 @@ import type {
   RegisterCredentials,
   ResetPasswordData,
   RegisteredUser,
+  AvatarOption, DeliveryAddress, DeliveryAddressInput, ProfileUpdate,
 } from '../types/auth.types';
 
 export const authApi = {
@@ -23,6 +24,32 @@ export const authApi = {
 
   getProfile: async (): Promise<Profile> => {
     const response = await apiClient.get<Profile>('/profile/');
+    return response.data;
+  },
+
+  updateProfile: async (data: ProfileUpdate): Promise<Profile> => {
+    const response = await apiClient.patch<Profile>('/profile/', data);
+    return response.data;
+  },
+  getAvatarOptions: async (): Promise<AvatarOption[]> => {
+    const response = await apiClient.get<{ avatars: AvatarOption[] }>('/profile/avatar-options/');
+    return response.data.avatars;
+  },
+  getAddresses: async (): Promise<DeliveryAddress[]> => {
+    const response = await apiClient.get<DeliveryAddress[]>('/profile/addresses/');
+    return response.data;
+  },
+  createAddress: async (data: DeliveryAddressInput): Promise<DeliveryAddress> => {
+    const response = await apiClient.post<DeliveryAddress>('/profile/addresses/', data);
+    return response.data;
+  },
+  updateAddress: async (id: number, data: DeliveryAddressInput): Promise<DeliveryAddress> => {
+    const response = await apiClient.patch<DeliveryAddress>(`/profile/addresses/${id}/`, data);
+    return response.data;
+  },
+  deleteAddress: async (id: number): Promise<void> => { await apiClient.delete(`/profile/addresses/${id}/`); },
+  setDefaultAddress: async (id: number): Promise<DeliveryAddress> => {
+    const response = await apiClient.post<DeliveryAddress>(`/profile/addresses/${id}/set-default/`);
     return response.data;
   },
 
