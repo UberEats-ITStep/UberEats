@@ -145,17 +145,6 @@ export const CartDrawer: FC = () => {
       title={`Your Order (${itemCount})`}
       footer={renderFooter()}
     >
-      <div className="mb-4 rounded bg-red-100 p-2 text-xs font-mono text-red-800 break-all border border-red-300">
-        DEBUG INFO:<br/>
-        isDrawerOpen: {String(isDrawerOpen)}<br/>
-        isLoading: {String(isLoading)}<br/>
-        cart is defined: {cart ? 'YES' : 'NO'}<br/>
-        cart.items type: {cart ? typeof cart.items : 'N/A'}<br/>
-        cart.items isArray: {cart ? String(Array.isArray(cart?.items)) : 'N/A'}<br/>
-        cart.items length: {cart?.items?.length}<br/>
-        itemCount: {itemCount}<br/>
-        error: {error || 'null'}
-      </div>
       {renderContent()}
     </Drawer>
   );

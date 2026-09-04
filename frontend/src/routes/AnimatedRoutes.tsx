@@ -43,7 +43,13 @@ const AnimatedRoutes: React.FC = () => {
           // Fade in the new route
           gsap.fromTo(transitionRef.current,
             { opacity: 0, y: 15 },
-            { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }
+            { 
+              opacity: 1, 
+              y: 0, 
+              duration: 0.4, 
+              ease: 'power2.out',
+              clearProps: 'transform,opacity'
+            }
           );
         }
       });
