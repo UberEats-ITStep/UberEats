@@ -60,7 +60,7 @@ export const RatingStars: FC<RatingStarsProps> = ({
             disabled={!isInteractive}
             onMouseEnter={() => handleMouseEnter(starValue)}
             onClick={() => handleClick(starValue)}
-            className={`${isInteractive ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'} focus:outline-none focus:ring-0`}
+            className={`${isInteractive ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'} rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2`}
             aria-label={isInteractive ? `Rate ${starValue} stars` : `${starValue} star`}
             aria-disabled={!isInteractive}
           >

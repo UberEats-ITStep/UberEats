@@ -26,12 +26,12 @@ class OrderItemSerializer(serializers.ModelSerializer):
     def get_subtotal(self, obj):
         return f'{obj.price * obj.quantity:.2f}'
 
-
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     restaurant_name = serializers.SerializerMethodField()
     restaurant_latitude = serializers.DecimalField(source='restaurant.latitude', max_digits=9, decimal_places=6, read_only=True)
     restaurant_longitude = serializers.DecimalField(source='restaurant.longitude', max_digits=9, decimal_places=6, read_only=True)
+    review_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -55,7 +55,12 @@ class OrderSerializer(serializers.ModelSerializer):
             'restaurant_latitude',
             'restaurant_longitude',
             'courier',
+            'review_id',
         ]
+
+    def get_review_id(self, obj):
+        review = getattr(obj, 'review', None)
+        return review.id if review else None
 
     def get_restaurant_name(self, obj):
         # Prefer the snapshot stored at checkout; fall back to the live restaurant name for existing records
@@ -106,35 +111,22 @@ class CheckoutSerializer(serializers.Serializer):
 
     def validate_street(self, value):
         value = value.strip()
-
         if not value:
-            raise serializers.ValidationError(
-                'Street cannot be empty.'
-            )
-
+            raise serializers.ValidationError('Street cannot be empty.')
         return value
 
     def validate_building(self, value):
         value = value.strip()
-
         if not value:
-            raise serializers.ValidationError(
-                'Building cannot be empty.'
-            )
-
+            raise serializers.ValidationError('Building cannot be empty.')
         return value
 
     def validate_contact_phone(self, value):
         value = value.strip()
-
         if value:
             import re
-
             if not re.fullmatch(r'^\+?[0-9\s\-()]{7,20}$', value):
-                raise serializers.ValidationError(
-                    'Enter a valid phone number.'
-                )
-
+                raise serializers.ValidationError('Enter a valid phone number.')
         return value
 
     def validate(self, attrs):
@@ -219,13 +211,11 @@ class CheckoutSerializer(serializers.Serializer):
     def create(self, validated_data):
         user = self.context['request'].user
         cart = user.cart
+
         delivery_address = validated_data.pop('delivery_address', None)
         validated_data.pop('delivery_address_id', None)
 
-        cart_items = cart.items.select_related(
-            'menu_item'
-        ).all()
-
+        cart_items = cart.items.select_related('menu_item').all()
         restaurant = cart_items[0].menu_item.restaurant
 
         if delivery_address is not None:
@@ -263,10 +253,7 @@ class CheckoutSerializer(serializers.Serializer):
         order_items_to_create = []
 
         for item in cart_items:
-            total_price += (
-                item.menu_item.price * item.quantity
-            )
-
+            total_price += item.menu_item.price * item.quantity
             order_items_to_create.append(
                 OrderItem(
                     order=order,
@@ -283,13 +270,11 @@ class CheckoutSerializer(serializers.Serializer):
         )
 
         order.total_price = total_price
-        order.save(
-            update_fields=['total_price']
-        )
-
+        order.save(update_fields=['total_price'])
         cart.items.all().delete()
 
         return order
+
 
 class OrderStatusSerializer(serializers.ModelSerializer):
     class Meta:

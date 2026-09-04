@@ -7,6 +7,7 @@ import OrderTracker from '../features/orders/components/OrderTracker';
 import { useOrderTracking } from '../features/orders/hooks/useOrderTracking';
 import { formatOrderDate } from '../features/orders/utils/order.utils';
 import { formatPrice } from '../utils/currency';
+import ReviewPromptCard from '../features/orders/components/ReviewPromptCard';
 
 const OrderDetails: FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -126,6 +127,15 @@ const OrderDetails: FC = () => {
               </div>
             </Card>
 
+            {order.status === 'COMPLETED' && (
+              <Card padding="lg" className="rounded-none border border-border-default">
+                {order.review_id ? (
+                  <p className="text-sm uppercase tracking-widest text-text-muted">Review submitted</p>
+                ) : (
+                  <ReviewPromptCard order={order} onReviewed={reload} />
+                )}
+              </Card>
+            )}
           </div>
         </div>
       </div>

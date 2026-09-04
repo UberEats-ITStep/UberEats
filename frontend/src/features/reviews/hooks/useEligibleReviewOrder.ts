@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { orderService } from '../../orders/api/order.service';
 import type { Review } from '../types/review.types';
 
+const EMPTY_REVIEWS: Review[] = [];
+
 export function useEligibleReviewOrder(
   restaurantId: number | undefined, 
   userId: number | undefined,
-  reviews: Review[]
+  reviews?: Review[]
 ) {
+  const safeReviews = reviews ?? EMPTY_REVIEWS;
   const [eligibleOrderId, setEligibleOrderId] = useState<number | null>(null);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
 
@@ -20,7 +23,14 @@ export function useEligibleReviewOrder(
       setIsCheckingEligibility(true);
       try {
         const orderHistory = await orderService.getOrderHistory();
-        
+
+        if (!Array.isArray(orderHistory)) {
+          console.error('useEligibleReviewOrder: orderHistory is not an array', orderHistory);
+          setEligibleOrderId(null);
+          setIsCheckingEligibility(false);
+          return;
+        }
+
         // Find completed orders for this restaurant
         const completedOrders = orderHistory.filter(
           order => order.restaurant === restaurantId && order.status === 'COMPLETED'
@@ -31,7 +41,7 @@ export function useEligibleReviewOrder(
 
         // Find the first order that does not have an existing review by this user
         const reviewedOrderIds = new Set(
-          reviews
+          safeReviews
             .filter(r => r.client === userId)
             .map(r => r.order)
         );
@@ -47,7 +57,7 @@ export function useEligibleReviewOrder(
     };
 
     void checkEligibility();
-  }, [restaurantId, userId, reviews]);
+  }, [restaurantId, userId, safeReviews]);
 
   return {
     eligibleOrderId,
