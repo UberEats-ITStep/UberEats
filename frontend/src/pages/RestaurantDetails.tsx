@@ -1,24 +1,47 @@
-import type { FC } from 'react';
+import { useMemo, useState, type FC } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useRestaurantDetails } from '../features/restaurants/hooks/useRestaurantDetails';
 import RestaurantHero from '../features/restaurants/components/RestaurantHero';
 import RestaurantStats from '../features/restaurants/components/RestaurantStats';
 import CategoryNavbar from '../features/restaurants/components/CategoryNavbar';
 import MenuSection from '../features/restaurants/components/MenuSection';
+import MenuFilters from '../features/restaurants/components/MenuFilters';
 import { LoadingState, Alert, Button, SectionContainer } from '../components/common';
 import { useCart } from '../context/CartContext';
 import type { MenuItem } from '../features/restaurants/types/restaurant.types';
 import ReviewList from '../features/reviews/components/ReviewList';
+import { filterMenuCategories } from '../features/restaurants/utils/menuFiltering';
 
 const RestaurantDetails: FC = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
   const { restaurant, isLoading, error, reload } = useRestaurantDetails(restaurantId);
   const { addToCart, isLoading: isCartLoading } = useCart();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<number | 'all'>('all');
+  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+
+  const filteredCategories = useMemo(() => {
+    if (!restaurant) {
+      return [];
+    }
+
+    return filterMenuCategories(restaurant.categories, {
+      searchTerm,
+      selectedCategory,
+      showAvailableOnly,
+    });
+  }, [restaurant, searchTerm, selectedCategory, showAvailableOnly]);
 
   const handleAddToCart = (item: MenuItem) => {
     if (restaurant) {
       void addToCart(item.id, 1, restaurant.id);
     }
+  };
+
+  const clearMenuFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('all');
+    setShowAvailableOnly(false);
   };
 
   if (isLoading) {
@@ -69,13 +92,25 @@ const RestaurantDetails: FC = () => {
               <h2 className="text-5xl font-serif italic text-text-primary">The Menu</h2>
             </div>
             <div className="lg:w-1/2">
-              <CategoryNavbar categories={restaurant.categories} />
+              <CategoryNavbar categories={filteredCategories} />
             </div>
           </div>
 
-          <MenuSection categories={restaurant.categories} onAddToCart={handleAddToCart} isLoading={isCartLoading} />
-          
-          {/* Customer Reviews Section */}
+          <div className="mt-8">
+            <MenuFilters
+              categories={restaurant.categories}
+              searchTerm={searchTerm}
+              selectedCategory={selectedCategory}
+              showAvailableOnly={showAvailableOnly}
+              onSearchChange={setSearchTerm}
+              onCategoryChange={setSelectedCategory}
+              onAvailabilityToggle={setShowAvailableOnly}
+              onClear={clearMenuFilters}
+            />
+          </div>
+
+          <MenuSection categories={filteredCategories} onAddToCart={handleAddToCart} isLoading={isCartLoading} />
+
           <div className="mt-24 border-t border-text-primary pt-8">
             <ReviewList restaurant={restaurant} onReviewChange={() => reload(true)} />
           </div>

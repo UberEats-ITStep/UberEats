@@ -1,4 +1,5 @@
 import { useState, type FC } from 'react';
+import FavoriteButton from '../../favorites/components/FavoriteButton';
 import type { RestaurantDetails } from '../types/restaurant.types';
 
 export interface RestaurantHeroProps {
@@ -29,9 +30,12 @@ const RestaurantHero: FC<RestaurantHeroProps> = ({ restaurant }) => {
               {restaurant.is_open_now ? 'Open now' : 'Closed'}
             </span>
           </div>
-          <h1 className="text-5xl lg:text-7xl font-serif italic tracking-tight text-text-primary mb-6 leading-none">
-            {restaurant.name}
-          </h1>
+          <div className="mb-6 flex items-center gap-3">
+            <h1 className="text-5xl lg:text-7xl font-serif italic tracking-tight text-text-primary leading-none">
+              {restaurant.name}
+            </h1>
+            <FavoriteButton restaurantId={restaurant.id} className="shrink-0" />
+          </div>
           {restaurant.description && (
             <p className="max-w-md text-sm leading-relaxed text-text-secondary">
               {restaurant.description}
