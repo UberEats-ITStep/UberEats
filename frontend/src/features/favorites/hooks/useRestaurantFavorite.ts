@@ -13,6 +13,7 @@ export interface UseRestaurantFavoriteResult {
 
 export const useRestaurantFavorite = (restaurantId?: number): UseRestaurantFavoriteResult => {
   const { isAuthenticated } = useAuth();
+  const canLoadFavorite = Boolean(restaurantId && isAuthenticated);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,9 +45,7 @@ export const useRestaurantFavorite = (restaurantId?: number): UseRestaurantFavor
   }, [isAuthenticated, restaurantId]);
 
   useEffect(() => {
-    if (!restaurantId || !isAuthenticated) {
-      setIsFavorite(false);
-      setFavoriteId(null);
+    if (!restaurantId || !canLoadFavorite) {
       return;
     }
 
@@ -76,7 +75,7 @@ export const useRestaurantFavorite = (restaurantId?: number): UseRestaurantFavor
 
     void loadFavoriteStatus();
     return () => controller.abort();
-  }, [isAuthenticated, restaurantId]);
+  }, [canLoadFavorite, restaurantId]);
 
   const toggleFavorite = useCallback(async () => {
     if (!restaurantId || !isAuthenticated) {
@@ -97,22 +96,18 @@ export const useRestaurantFavorite = (restaurantId?: number): UseRestaurantFavor
       const created = await favoritesService.addFavorite(restaurantId);
       setIsFavorite(true);
       setFavoriteId(created.id);
-    } catch (favoriteError) {
-      const message =
-        favoriteError instanceof Error && 'response' in favoriteError
-          ? 'This restaurant could not be updated right now.'
-          : 'This restaurant could not be updated right now.';
-      setError(message);
+    } catch {
+      setError('This restaurant could not be updated right now.');
     } finally {
       setIsLoading(false);
     }
   }, [favoriteId, isAuthenticated, isFavorite, restaurantId]);
 
   return {
-    isFavorite,
-    favoriteId,
+    isFavorite: canLoadFavorite && isFavorite,
+    favoriteId: canLoadFavorite ? favoriteId : null,
     isLoading,
-    error,
+    error: canLoadFavorite ? error : null,
     toggleFavorite,
     reload,
   };

@@ -19,7 +19,7 @@ const OrderItemsList: FC<OrderItemsListProps> = ({ items }) => {
           <li key={item.id} className="grid gap-3 py-5 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-8">
             <div>
               <p className="text-lg font-bold text-text-primary">
-                {item.menu_item_name ?? `Item #${item.menu_item}`}
+                {item.menu_item_name?.trim() || 'Item unavailable'}
               </p>
               <p className="mt-1 text-sm text-text-muted">{formatPrice(item.price)} each</p>
             </div>

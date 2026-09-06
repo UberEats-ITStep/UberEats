@@ -29,6 +29,11 @@ const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '' 
   const navigate = useNavigate();
   const { isFavorite, isLoading, toggleFavorite } = useRestaurantFavorite(restaurantId);
 
+  let buttonTitle = 'Log in to save favorites';
+  if (isAuthenticated) {
+    buttonTitle = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+  }
+
   const handleClick = async () => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -48,7 +53,7 @@ const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '' 
       onClick={handleClick}
       isLoading={isLoading}
       aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-      title={isAuthenticated ? (isFavorite ? 'Remove from favorites' : 'Add to favorites') : 'Log in to save favorites'}
+      title={buttonTitle}
     >
       {isFavorite ? 'Saved' : 'Save'}
     </Button>
