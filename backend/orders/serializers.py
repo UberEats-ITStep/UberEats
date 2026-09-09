@@ -187,12 +187,25 @@ class CheckoutSerializer(serializers.Serializer):
             if missing_fields:
                 raise serializers.ValidationError(missing_fields)
 
-        if not hasattr(user, 'cart') or not user.cart.items.exists():
+        if not hasattr(user, 'cart'):
             raise serializers.ValidationError({
                 'non_field_errors': 'Your cart is empty.'
             })
 
-        items = user.cart.items.select_related('menu_item')
+        items = list(user.cart.items.select_related('menu_item__restaurant'))
+        if not items:
+            raise serializers.ValidationError({
+                'non_field_errors': 'Your cart is empty.'
+            })
+
+        if any(not item.menu_item.restaurant.is_active for item in items):
+            raise serializers.ValidationError({
+                'non_field_errors': 'Your cart contains a restaurant that is not accepting orders.'
+            })
+        if any(not item.menu_item.is_available for item in items):
+            raise serializers.ValidationError({
+                'non_field_errors': 'Your cart contains an unavailable item.'
+            })
 
         restaurant_ids = {
             item.menu_item.restaurant_id

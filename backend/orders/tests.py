@@ -2,6 +2,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.db.models.deletion import ProtectedError
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -288,6 +289,45 @@ class OrderCheckoutApiTests(APITestCase):
 
         self.assertEqual(Order.objects.count(), 0)
 
+    def test_checkout_rejects_unavailable_menu_items(self):
+        self.add_cart_item()
+        self.menu_item.is_available = False
+        self.menu_item.unavailable_reason = 'Sold out'
+        self.menu_item.save()
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            self.valid_checkout_data(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data['non_field_errors'][0],
+            'Your cart contains an unavailable item.',
+        )
+        self.assertFalse(Order.objects.exists())
+
+    def test_checkout_rejects_items_from_inactive_restaurants(self):
+        self.add_cart_item()
+        self.restaurant.is_active = False
+        self.restaurant.save(update_fields=['is_active'])
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.checkout_url,
+            self.valid_checkout_data(),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data['non_field_errors'][0],
+            'Your cart contains a restaurant that is not accepting orders.',
+        )
+        self.assertFalse(Order.objects.exists())
+
     def test_checkout_requires_street(self):
         self.add_cart_item()
 
@@ -513,6 +553,14 @@ class OrderCheckoutApiTests(APITestCase):
         response = self.client.get(reverse('order_detail', args=[order.id]))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['restaurant_name'], 'Pizza House')
+
+    def test_restaurant_with_historical_order_cannot_be_deleted(self):
+        order = self.create_order(self.user)
+
+        with self.assertRaises(ProtectedError):
+            self.restaurant.delete()
+
+        self.assertTrue(Order.objects.filter(pk=order.pk).exists())
 
     def test_price_change_preserves_order_price_snapshot(self):
         self.add_cart_item()

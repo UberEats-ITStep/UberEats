@@ -20,7 +20,7 @@ class FavoriteViewSet(
 
     def get_queryset(self):
         return (
-            Favorite.objects.filter(user=self.request.user)
+            Favorite.objects.filter(user=self.request.user, restaurant__is_active=True)
             .select_related("restaurant", "restaurant__cuisine")
             .prefetch_related("restaurant__opening_hours")
         )
@@ -44,7 +44,10 @@ class FavoriteViewSet(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        restaurant = get_object_or_404(Restaurant, pk=restaurant_id)
+        restaurant = get_object_or_404(
+            Restaurant.objects.filter(is_active=True),
+            pk=restaurant_id,
+        )
         return Response(
             {
                 "restaurant": restaurant.pk,

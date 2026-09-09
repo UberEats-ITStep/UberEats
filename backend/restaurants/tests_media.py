@@ -198,23 +198,23 @@ class SerializerImageResolutionTests(APITestCase):
 
 
 class SeedMediaCommandTests(TestCase):
-    def test_seed_is_idempotent(self):
-        call_command("seed_media")
+    def test_compatibility_alias_is_idempotent(self):
+        output = io.StringIO()
+        call_command("seed_media", stdout=output)
         first_restaurant_count = Restaurant.objects.count()
         first_item_count = MenuItem.objects.count()
 
-        call_command("seed_media")
+        call_command("seed_media", stdout=output)
 
         self.assertEqual(Restaurant.objects.count(), first_restaurant_count)
         self.assertEqual(MenuItem.objects.count(), first_item_count)
+        self.assertIn("deprecated", output.getvalue())
 
-    def test_seed_assigns_non_empty_image_urls(self):
+    def test_compatibility_alias_does_not_create_placeholder_urls(self):
         call_command("seed_media")
 
         for restaurant in Restaurant.objects.all():
-            self.assertTrue(restaurant.image_url)
-            self.assertTrue(restaurant.image_url.startswith("https://"))
+            self.assertNotIn("picsum.photos", restaurant.image_url)
 
         for item in MenuItem.objects.all():
-            self.assertTrue(item.image_url)
-            self.assertTrue(item.image_url.startswith("https://"))
+            self.assertNotIn("picsum.photos", item.image_url)
