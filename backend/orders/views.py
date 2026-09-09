@@ -21,7 +21,12 @@ class OrderHistoryView(generics.ListAPIView):
     serializer_class = OrderSerializer
 
     def get_queryset(self):
-        return Order.objects.filter(client=self.request.user).prefetch_related('items__menu_item').order_by('-created_at')
+        return (
+            Order.objects.filter(client=self.request.user)
+            .exclude(status=Order.STATUS_DECLINED)
+            .prefetch_related('items__menu_item')
+            .order_by('-created_at')
+        )
 
 
 class OrderDetailView(generics.RetrieveAPIView):
