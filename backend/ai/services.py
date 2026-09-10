@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db.models import Q
 from rest_framework.exceptions import APIException
 from restaurants.models import MenuItem
+from .user_context import UserContextBuilder
 
 from .serializers import ExtractedIntentSerializer, LLMRecommendationResponseSerializer
 from .prompts import INTENT_EXTRACTION_PROMPT, RECOMMENDATION_PROMPT
@@ -103,7 +104,7 @@ class CandidateRetriever:
             queryset = queryset.filter(keyword_q).distinct()
 
         # Limit to reasonable number to fit in context window
-        candidates = queryset.order_by("-restaurant__rating")[:30]
+        candidates = queryset.order_by("-restaurant__rating", "-id")[:50]
         
         results = []
         for item in candidates:
@@ -124,22 +125,44 @@ class CandidateRanker:
     def __init__(self, client=None):
         self.client = client or GroqClient()
 
-    def rank(self, query: str, candidates: list) -> dict:
+    def rank(
+        self,
+        query: str,
+        candidates: list,
+        user_context: dict,
+    ) -> dict:
+
         if not candidates:
-            return {"recommendations": [], "summary": "No candidates available."}
-            
-        user_content = f"USER REQUEST: {query}\n\nAVAILABLE CANDIDATES:\n{json.dumps(candidates, indent=2)}"
-        
+            return {
+                "recommendations": [],
+                "summary": "No candidates available.",
+            }
+
+        user_content = (
+            f"CURRENT USER REQUEST:\n{query}\n\n"
+            f"AUTHORITATIVE USER CONTEXT:\n"
+            f"{json.dumps(user_context, ensure_ascii=False, indent=2)}\n\n"
+            f"AVAILABLE CANDIDATES:\n"
+            f"{json.dumps(candidates, ensure_ascii=False, indent=2)}"
+        )
+
         raw_json = self.client.chat_completion(
             system_prompt=RECOMMENDATION_PROMPT,
-            user_content=user_content
+            user_content=user_content,
         )
-        
-        serializer = LLMRecommendationResponseSerializer(data=raw_json)
+
+        serializer = LLMRecommendationResponseSerializer(
+            data=raw_json
+        )
+
         if serializer.is_valid():
             return serializer.validated_data
-            
-        logger.warning(f"LLM Response schema validation failed: {serializer.errors}")
+
+        logger.warning(
+            "LLM Response schema validation failed: %s",
+            serializer.errors,
+        )
+
         raise GroqAPIException()
 
 class RecommendationOrchestrator:
@@ -148,41 +171,75 @@ class RecommendationOrchestrator:
         self.extractor = IntentExtractor(self.client)
         self.retriever = CandidateRetriever()
         self.ranker = CandidateRanker(self.client)
+        self.user_context_builder = UserContextBuilder()
 
-    def process(self, query: str) -> dict:
+    def process(self, query: str, user) -> dict:
         logger.info(f"AI Recommend started for query: '{query}'")
-        
-        # 1. Extract Intent
+
         intent = self.extractor.extract(query)
         logger.info(f"Extracted Intent: {intent}")
-        
-        # 2. Retrieve Candidates
+
+        user_context = self.user_context_builder.build(user)
+        logger.info(
+            "Built user context (has_history=%s, completed_orders=%s)",
+            user_context["has_history"],
+            user_context["completed_order_count"],
+        )
+
         candidates = self.retriever.retrieve(intent)
         logger.info(f"Candidate count retrieved: {len(candidates)}")
-        
+
         if not candidates:
             return {
                 "message": "I couldn't find an option that matches all of those requirements.",
                 "recommendations": []
             }
-            
-        # 3. Rank Candidates
-        ranking_result = self.ranker.rank(query, candidates)
-        raw_recommendations = ranking_result.get("recommendations", [])
+
+        ranking_result = self.ranker.rank(
+            query,
+            candidates,
+            user_context,
+        )
+
+        raw_recommendations = ranking_result.get(
+            "recommendations",
+            []
+        )
+
         summary = ranking_result.get("summary", "")
-        
-        # 4. Validate against DB
-        valid_ids = [rec["menu_item_id"] for rec in raw_recommendations]
-        logger.info(f"LLM Ranked IDs: {valid_ids}")
-        
-        db_items = MenuItem.objects.filter(id__in=valid_ids, is_available=True).select_related('restaurant', 'category')
-        item_map = {item.id: item for item in db_items}
-        
+
+        candidate_ids = {
+            candidate["id"]
+            for candidate in candidates
+        }
+        valid_ids = [
+            rec["menu_item_id"]
+            for rec in raw_recommendations
+            if rec["menu_item_id"] in candidate_ids
+        ]
+
+        db_items = (
+            MenuItem.objects
+            .filter(
+                id__in=valid_ids,
+                is_available=True,
+            )
+            .select_related("restaurant", "category")
+        )
+
+        item_map = {
+            item.id: item
+            for item in db_items
+        }
+
         final_recommendations = []
+
         for rec in raw_recommendations:
             item_id = rec["menu_item_id"]
+
             if item_id in item_map:
                 item = item_map[item_id]
+
                 final_recommendations.append({
                     "menu_item": {
                         "id": item.id,
@@ -190,21 +247,22 @@ class RecommendationOrchestrator:
                         "price": str(item.price),
                         "restaurant": {
                             "id": item.restaurant.id,
-                            "name": item.restaurant.name
-                        }
+                            "name": item.restaurant.name,
+                        },
                     },
-                    "reason": rec["reason"]
+                    "reason": rec["reason"],
                 })
-        
-        logger.info(f"Final validated recommendations count: {len(final_recommendations)}")
-        
+
         if not final_recommendations:
             return {
-                "message": "I couldn't find an option that perfectly matches what you're looking for right now.",
-                "recommendations": []
+                "message": (
+                    "I couldn't find an option that perfectly "
+                    "matches what you're looking for right now."
+                ),
+                "recommendations": [],
             }
-            
+
         return {
             "message": summary,
-            "recommendations": final_recommendations
+            "recommendations": final_recommendations,
         }
