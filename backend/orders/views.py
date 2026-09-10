@@ -24,6 +24,7 @@ class OrderHistoryView(generics.ListAPIView):
         return (
             Order.objects.filter(client=self.request.user)
             .exclude(status=Order.STATUS_DECLINED)
+            .select_related('restaurant')
             .prefetch_related('items__menu_item')
             .order_by('-created_at')
         )
