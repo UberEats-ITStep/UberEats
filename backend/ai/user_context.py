@@ -14,6 +14,8 @@ class UserContextBuilder:
     MAX_RECENT_ORDERS = 5
 
     def build(self, user):
+        favorite_restaurants = self._get_favorite_restaurants(user)
+        highly_rated_restaurants = self._get_highly_rated_restaurants(user)
         orders = list(
             Order.objects
             .filter(
@@ -33,6 +35,11 @@ class UserContextBuilder:
         if not orders:
             context = self._empty_context()
             context["review_count"] = review_count
+            context["favorite_restaurants"] = favorite_restaurants
+            context["highly_rated_restaurants"] = highly_rated_restaurants
+            context["has_history"] = bool(
+                review_count or favorite_restaurants
+            )
             return context
 
         item_counter = Counter()
@@ -57,9 +64,6 @@ class UserContextBuilder:
             )
 
             restaurant_counter[restaurant_name] += 1
-
-            if order.restaurant.cuisine:
-                cuisine_counter[order.restaurant.cuisine.name] += 1
 
             recent_order_items = []
 
@@ -138,11 +142,9 @@ class UserContextBuilder:
                 self.MAX_TOP_ITEMS,
             ),
 
-            "favorite_restaurants": self._get_favorite_restaurants(user),
+            "favorite_restaurants": favorite_restaurants,
 
-            "highly_rated_restaurants": (
-                self._get_highly_rated_restaurants(user)
-            ),
+            "highly_rated_restaurants": highly_rated_restaurants,
 
             "average_order_value": round(
                 float(average_order_value),

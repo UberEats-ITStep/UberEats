@@ -180,7 +180,11 @@ class RecommendationOrchestrator:
         logger.info(f"Extracted Intent: {intent}")
 
         user_context = self.user_context_builder.build(user)
-        logger.info(f"User context: {user_context}")
+        logger.info(
+            "Built user context (has_history=%s, completed_orders=%s)",
+            user_context["has_history"],
+            user_context["completed_order_count"],
+        )
 
         candidates = self.retriever.retrieve(intent)
         logger.info(f"Candidate count retrieved: {len(candidates)}")
@@ -204,9 +208,14 @@ class RecommendationOrchestrator:
 
         summary = ranking_result.get("summary", "")
 
+        candidate_ids = {
+            candidate["id"]
+            for candidate in candidates
+        }
         valid_ids = [
             rec["menu_item_id"]
             for rec in raw_recommendations
+            if rec["menu_item_id"] in candidate_ids
         ]
 
         db_items = (

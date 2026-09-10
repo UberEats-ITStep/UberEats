@@ -1,6 +1,8 @@
 import json
 from decimal import Decimal
 from unittest.mock import patch
+from unittest import skipUnless
+from django.conf import settings
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -18,6 +20,9 @@ from restaurants.models import (
 
 from ai.services import GroqAPIException
 from ai.user_context import UserContextBuilder
+from favorites.models import Favorite
+from orders.models import Order, OrderItem
+from reviews.models import Review
 
 
 User = get_user_model()
@@ -152,6 +157,18 @@ class AIRecommendTests(APITestCase):
     # =============================================================
     # BASIC RECOMMENDATION
     # =============================================================
+
+    @skipUnless(settings.GROQ_API_KEY, "GROQ_API_KEY is not configured")
+    def test_temporary_real_groq_recommendation(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            self.url,
+            {"query": "Recommend vegetarian food under 200 UAH"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIn("recommendations", response.data)
 
     @patch("ai.services.GroqClient.chat_completion")
     def test_successful_recommendation(self, mock_groq):
@@ -1016,3 +1033,131 @@ class AIRecommendTests(APITestCase):
             recommendations[0]["menu_item"]["id"],
             self.item2.id,
         )
+
+    def test_completed_orders_build_compact_behavioral_profile(self):
+        first_order = Order.objects.create(
+            client=self.user,
+            restaurant=self.restaurant,
+            status=Order.STATUS_COMPLETED,
+            total_price=Decimal("200.00"),
+            street="Soborna",
+            building="1",
+        )
+        OrderItem.objects.create(
+            order=first_order,
+            menu_item=self.item2,
+            quantity=2,
+            price=self.item2.price,
+        )
+        second_order = Order.objects.create(
+            client=self.user,
+            restaurant=self.restaurant,
+            status=Order.STATUS_COMPLETED,
+            total_price=Decimal("300.00"),
+            street="Soborna",
+            building="1",
+        )
+        OrderItem.objects.create(
+            order=second_order,
+            menu_item=self.item1,
+            quantity=2,
+            price=self.item1.price,
+        )
+        ignored_order = Order.objects.create(
+            client=self.user,
+            restaurant=self.italian_restaurant,
+            status=Order.STATUS_CANCELLED,
+            total_price=Decimal("250.00"),
+            street="Soborna",
+            building="1",
+        )
+        OrderItem.objects.create(
+            order=ignored_order,
+            menu_item=self.item3,
+            quantity=1,
+            price=self.item3.price,
+        )
+
+        context = UserContextBuilder().build(self.user)
+
+        self.assertTrue(context["has_history"])
+        self.assertEqual(context["completed_order_count"], 2)
+        self.assertEqual(context["average_order_value"], 250.0)
+        self.assertEqual(context["typical_price_range"], [200.0, 300.0])
+        self.assertEqual(context["top_cuisines"][0], {"name": "Japanese", "count": 4})
+        self.assertEqual(context["top_categories"][0], {"name": "Sushi", "count": 4})
+        self.assertEqual(context["dietary_preferences"]["vegetarian_ratio"], 0.5)
+        self.assertNotIn("Italian", {entry["name"] for entry in context["top_cuisines"]})
+        self.assertEqual(UserContextBuilder().build(self.other_user)["top_cuisines"], [])
+
+    def test_favorites_are_context_even_without_completed_orders(self):
+        Favorite.objects.create(user=self.user, restaurant=self.restaurant)
+
+        context = UserContextBuilder().build(self.user)
+
+        self.assertTrue(context["has_history"])
+        self.assertEqual(context["completed_order_count"], 0)
+        self.assertEqual(
+            context["favorite_restaurants"],
+            [{"id": self.restaurant.id, "name": self.restaurant.name}],
+        )
+        self.assertEqual(
+            UserContextBuilder().build(self.other_user)["favorite_restaurants"],
+            [],
+        )
+
+    def test_high_rating_is_context_even_without_completed_orders(self):
+        order = Order.objects.create(
+            client=self.user,
+            restaurant=self.restaurant,
+            status=Order.STATUS_CANCELLED,
+            total_price=Decimal("150.00"),
+            street="Soborna",
+            building="1",
+        )
+        Review.objects.create(
+            client=self.user,
+            restaurant=self.restaurant,
+            order=order,
+            rating=5,
+        )
+
+        context = UserContextBuilder().build(self.user)
+
+        self.assertTrue(context["has_history"])
+        self.assertEqual(context["review_count"], 1)
+        self.assertEqual(
+            context["highly_rated_restaurants"],
+            [{"id": self.restaurant.id, "name": self.restaurant.name, "rating": 5.0}],
+        )
+
+    @patch("ai.services.GroqClient.chat_completion")
+    def test_existing_item_outside_filtered_candidates_is_discarded(self, mock_groq):
+        self.client.force_authenticate(user=self.user)
+        mock_groq.side_effect = [
+            {
+                "max_price": 300,
+                "is_vegetarian": None,
+                "is_vegan": True,
+                "keywords": [],
+                "categories": ["Sushi"],
+                "cuisines": ["Japanese"],
+            },
+            {
+                "recommendations": [
+                    {
+                        "menu_item_id": self.item3.id,
+                        "reason": "Existing, but violates the request.",
+                    }
+                ],
+                "summary": "Invalid selection.",
+            },
+        ]
+
+        response = self.client.post(
+            self.url,
+            {"query": "I want vegan sushi under 300 UAH"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["recommendations"], [])
