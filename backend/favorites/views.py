@@ -45,11 +45,12 @@ class FavoriteViewSet(
             )
 
         restaurant = get_object_or_404(Restaurant, pk=restaurant_id)
+        favorite = self.get_queryset().filter(restaurant=restaurant).first()
+        
         return Response(
             {
                 "restaurant": restaurant.pk,
-                "is_favorite": self.get_queryset()
-                .filter(restaurant=restaurant)
-                .exists(),
+                "is_favorite": favorite is not None,
+                "favorite_id": favorite.id if favorite else None,
             }
         )

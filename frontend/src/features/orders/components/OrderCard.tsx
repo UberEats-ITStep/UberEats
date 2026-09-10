@@ -96,9 +96,17 @@ const OrderCard: FC<OrderCardProps> = ({ order, isActive = false }) => {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-5 w-full sm:w-auto">
                     <div className="h-16 w-16 shrink-0 overflow-hidden bg-muted border-l border-b border-border-default">
-                        <div className="flex h-full w-full items-center justify-center bg-primary text-surface opacity-50 font-serif italic text-[10px] tracking-widest">
-                            BiteUp
-                        </div>
+                        {order.restaurant_image_url ? (
+                            <img 
+                                src={order.restaurant_image_url} 
+                                alt={restaurantName}
+                                className={`h-full w-full object-cover transition-all duration-500 hover:scale-105 ${isCancelled ? 'grayscale opacity-70' : 'grayscale hover:grayscale-0'}`}
+                            />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-primary text-surface opacity-50 font-serif italic text-[10px] tracking-widest">
+                                BiteUp
+                            </div>
+                        )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-1">

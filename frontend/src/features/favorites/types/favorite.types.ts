@@ -25,4 +25,5 @@ export interface Favorite {
 export interface FavoriteCheckResponse {
   restaurant: number;
   is_favorite: boolean;
+  favorite_id?: number | null;
 }

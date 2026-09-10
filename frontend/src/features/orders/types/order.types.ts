@@ -34,6 +34,7 @@ export interface Order {
     restaurant: number | null;
     /** Historical name captured when the order was placed. */
     restaurant_name?: string;
+    restaurant_image_url?: string | null;
     restaurant_latitude?: string | null;
     restaurant_longitude?: string | null;
     items: OrderItem[];

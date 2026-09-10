@@ -30,15 +30,8 @@ export const useRestaurantFavorite = (restaurantId?: number): UseRestaurantFavor
       setError(null);
       const status = await favoritesService.checkFavorite(restaurantId);
       setIsFavorite(Boolean(status.is_favorite));
-      setFavoriteId(null);
+      setFavoriteId(status.favorite_id ?? null);
 
-      if (status.is_favorite) {
-        const favorites = await favoritesService.getFavorites();
-        const match = favorites.find((entry) => entry.restaurant === restaurantId);
-        if (match) {
-          setFavoriteId(match.id);
-        }
-      }
     } catch {
       setError('We could not load your favorite status right now.');
     }
@@ -55,15 +48,8 @@ export const useRestaurantFavorite = (restaurantId?: number): UseRestaurantFavor
       try {
         const status = await favoritesService.checkFavorite(restaurantId, controller.signal);
         setIsFavorite(Boolean(status.is_favorite));
-        setFavoriteId(null);
+        setFavoriteId(status.favorite_id ?? null);
 
-        if (status.is_favorite) {
-          const favorites = await favoritesService.getFavorites(controller.signal);
-          const match = favorites.find((entry) => entry.restaurant === restaurantId);
-          if (match) {
-            setFavoriteId(match.id);
-          }
-        }
       } catch {
         setError('We could not load your favorite status right now.');
       } finally {
