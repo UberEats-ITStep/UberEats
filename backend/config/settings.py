@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
     # --- APPS ---
     "restaurants",
     "favorites",
@@ -59,7 +60,8 @@ INSTALLED_APPS = [
     "users",
     "cart",
     "reviews",
-    "django_filters",
+    "ai",
+    "payments",
 ]
 
 MIDDLEWARE = [
@@ -156,31 +158,29 @@ CORS_ALLOW_CREDENTIALS = True
 AUTH_USER_MODEL = "users.User"
 
 PASSWORD_RESET_CODE_TTL_SECONDS = int(
-    os.getenv('PASSWORD_RESET_CODE_TTL_SECONDS', '600')
+    os.getenv("PASSWORD_RESET_CODE_TTL_SECONDS", "600")
 )
 PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = int(
-    os.getenv('PASSWORD_RESET_RESEND_COOLDOWN_SECONDS', '60')
+    os.getenv("PASSWORD_RESET_RESEND_COOLDOWN_SECONDS", "60")
 )
 
 EMAIL_BACKEND = os.getenv(
-    'EMAIL_BACKEND',
-    'django.core.mail.backends.smtp.EmailBackend',
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend",
 )
-EMAIL_HOST = os.getenv('EMAIL_HOST', '')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@example.com')
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@example.com")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.ScopedRateThrottle",
-    ),
+    "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.ScopedRateThrottle",),
     "DEFAULT_THROTTLE_RATES": {
         "ai_recommend": "5/min",
         "auth_login": "10/min",
@@ -195,9 +195,9 @@ REST_FRAMEWORK = {
             "PASSWORD_RESET_CONFIRM_THROTTLE_RATE",
             "10/hour",
         ),
-        'change_password': os.getenv(
-            'CHANGE_PASSWORD_THROTTLE_RATE',
-            '5/hour',
+        "change_password": os.getenv(
+            "CHANGE_PASSWORD_THROTTLE_RATE",
+            "5/hour",
         ),
     },
 }
@@ -214,10 +214,11 @@ SIMPLE_JWT = {
 # Order Lifecycle Simulation (Development Only)
 # List of tuples: (Target Status, Delay in seconds before transitioning to it)
 ORDER_SIMULATION_TRANSITIONS = [
-    ("PREPARING", 10),
-    ("READY", 10),
-    ("DELIVERING", 10),
-    ("COMPLETED", 10),
+    ("ACCEPTED", 15),
+    ("PREPARING", 15),
+    ("READY", 15),
+    ("DELIVERING", 15),
+    ("COMPLETED", 15),
 ]
 
 # --- Email Verification ---
@@ -237,7 +238,10 @@ else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # Automatically use the Brevo verified email (SMTP_USER) as the sender if not explicitly set
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", os.getenv("SMTP_DEFAULT_FROM_EMAIL", os.getenv("SMTP_USER", "webmaster@localhost")))
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    os.getenv("SMTP_DEFAULT_FROM_EMAIL", os.getenv("SMTP_USER", "webmaster@localhost")),
+)
 
 # Cache (required for DRF Throttling)
 CACHES = {
@@ -248,11 +252,15 @@ CACHES = {
 }
 
 
-
 if {"test", "makemigrations"} & set(sys.argv):
     if "DEFAULT_THROTTLE_CLASSES" in REST_FRAMEWORK:
         REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []
 
 # AI Configuration
-GROQ_API_KEY = os.getenv('GROQ_API_KEY')
-GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama3-70b-8192')
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+
+# Stripe Configuration
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', 'sk_test_mock')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', 'whsec_mock')
+PAYMENT_CURRENCY = os.getenv('PAYMENT_CURRENCY', 'uah')

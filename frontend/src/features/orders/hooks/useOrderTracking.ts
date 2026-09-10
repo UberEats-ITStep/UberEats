@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useOrderDetails } from './useOrderDetails';
 import type { OrderStatus } from '../types/order.types';
 
-const ORDER_STATUS_POLL_INTERVAL = 10000;
+const ORDER_STATUS_POLL_INTERVAL = 5000;
 
 const isTerminalStatus = (status?: OrderStatus) => {
   return status === 'COMPLETED' || status === 'CANCELLED';
@@ -10,9 +10,11 @@ const isTerminalStatus = (status?: OrderStatus) => {
 
 export const useOrderTracking = (orderId?: string) => {
   const { order, isLoading, error, backgroundError, reload } = useOrderDetails(orderId);
+  const status = order?.status;
+  const isTerminal = isTerminalStatus(status);
 
   useEffect(() => {
-    if (!order || isTerminalStatus(order.status)) {
+    if (!orderId || isTerminal) {
       return;
     }
 
@@ -21,7 +23,7 @@ export const useOrderTracking = (orderId?: string) => {
     }, ORDER_STATUS_POLL_INTERVAL);
 
     return () => window.clearInterval(timer);
-  }, [order?.status, reload, order]);
+  }, [orderId, isTerminal, reload]);
 
   return {
     order,

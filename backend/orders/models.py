@@ -7,6 +7,7 @@ from restaurants.models import MenuItem, Restaurant
 
 
 class Order(models.Model):
+    STATUS_AWAITING_PAYMENT = 'AWAITING_PAYMENT'
     STATUS_PENDING = 'PENDING'
     STATUS_ACCEPTED = 'ACCEPTED'
     STATUS_PREPARING = 'PREPARING'
@@ -14,8 +15,10 @@ class Order(models.Model):
     STATUS_DELIVERING = 'DELIVERING'
     STATUS_COMPLETED = 'COMPLETED'
     STATUS_CANCELLED = 'CANCELLED'
+    STATUS_DECLINED = 'DECLINED'
 
     STATUS_CHOICES = (
+        (STATUS_AWAITING_PAYMENT, 'AWAITING_PAYMENT'),
         (STATUS_PENDING, 'PENDING'),
         (STATUS_ACCEPTED, 'ACCEPTED'),
         (STATUS_PREPARING, 'PREPARING'),
@@ -23,6 +26,7 @@ class Order(models.Model):
         (STATUS_DELIVERING, 'DELIVERING'),
         (STATUS_COMPLETED, 'COMPLETED'),
         (STATUS_CANCELLED, 'CANCELLED'),
+        (STATUS_DECLINED, 'DECLINED'),
     )
 
     client = models.ForeignKey(
