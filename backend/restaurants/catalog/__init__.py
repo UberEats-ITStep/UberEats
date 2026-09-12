@@ -1,0 +1,1 @@
+"""Versioned catalog data and validation helpers."""

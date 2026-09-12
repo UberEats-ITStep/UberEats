@@ -11,6 +11,20 @@ pip install -r requirements.txt
 
 Update `.env` with your PostgreSQL credentials, then create the database named by `POSTGRES_DB`.
 
+For Neon, set `DATABASE_URL` to the TLS connection string from the Neon
+dashboard, including `sslmode=require`. It takes priority over `POSTGRES_*`.
+Set `DJANGO_DEBUG=false`, a non-default `DJANGO_SECRET_KEY`,
+`DJANGO_ALLOWED_HOSTS`, and `CORS_ALLOWED_ORIGINS` in production. The
+application enables PostgreSQL connection health checks and starts with
+`DATABASE_CONN_MAX_AGE=0`, which avoids reusing a connection after a Neon
+compute wakes from idle. Production enables secure cookies and HTTPS redirect;
+set `DJANGO_BEHIND_HTTPS_PROXY=true` when TLS terminates at a trusted reverse
+proxy. Restaurant open-state evaluation uses the `Europe/Kyiv` timezone.
+
+For a temporary local run without PostgreSQL, set `DJANGO_USE_SQLITE=true` in
+`.env`. This creates the ignored `backend/db.sqlite3` file and must not be used
+for Neon or production.
+
 ```bash
 python manage.py makemigrations users restaurants orders
 python manage.py migrate

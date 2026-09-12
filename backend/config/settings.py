@@ -14,7 +14,14 @@ import os
 import sys
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+
+from config.database import (
+    DatabaseConfigurationError,
+    add_connection_safety,
+    database_config_from_environment,
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,19 +29,43 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def required_environment(name, default=None):
+    value = os.getenv(name, default)
+    if value is None:
+        raise ImproperlyConfigured(f"{name} must be set.")
+    return value
+
+
+def environment_flag(name, default="false"):
+    value = required_environment(name, default).lower()
+    if value not in {"true", "false"}:
+        raise ImproperlyConfigured(f"{name} must be either true or false.")
+    return value == "true"
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-1fznboq%1zi(aeu&e^s2u+zeipb+-*ug5%)sl-k&6mi_ed*4lr",
-)
+SECRET_KEY = required_environment("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = environment_flag("DJANGO_DEBUG", "true")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in required_environment("DJANGO_ALLOWED_HOSTS", "*").split(",")
+    if host.strip()
+]
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = environment_flag("DJANGO_SECURE_SSL_REDIRECT")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    if environment_flag("DJANGO_BEHIND_HTTPS_PROXY"):
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -48,16 +79,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
     "corsheaders",
+    "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
-    # --- APPS ---
-    "restaurants",
-    "favorites",
-    "orders",
     "users",
+    "restaurants",
+    "orders",
+    "favorites",
     "cart",
     "reviews",
     "ai",
@@ -84,6 +114,7 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
+                "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
@@ -108,12 +139,6 @@ DATABASES = {
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
     }
 }
-
-if {"test", "makemigrations"} & set(sys.argv):
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
-    }
 
 
 # Password validation
@@ -140,7 +165,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Europe/Kyiv"
 
 USE_I18N = True
 

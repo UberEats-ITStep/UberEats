@@ -14,6 +14,9 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
+from django.contrib.auth import get_user_model
+from orders.models import Order
+from .catalog.rivne import RIVNE_CATALOG
 from .models import Category, Cuisine, MenuItem, OpeningHours, Restaurant
 from .serializers import MenuItemSerializer
 
@@ -332,17 +335,49 @@ class RestaurantApiTests(APITestCase):
         self.assertEqual(fastest_response.data[0]["id"], faster.pk)
         self.assertEqual(rating_response.data[0]["name"], "Slower")
 
+    def test_inactive_restaurant_and_its_menu_are_hidden_from_public_apis(self):
+        restaurant, _, _, _ = self.create_graph()
+        restaurant.is_active = False
+        restaurant.save(update_fields=["is_active"])
+
+        list_response = self.client.get(self.list_url)
+        detail_response = self.client.get(reverse("restaurant-detail", args=[restaurant.pk]))
+        menu_response = self.client.get(reverse("menuitem-list"))
+
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data, [])
+        self.assertEqual(detail_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(menu_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(menu_response.data["count"], 0)
+
 
 class SeedAndMigrationTests(TestCase):
-    def test_seed_db_is_idempotent_and_complete(self):
+    def test_catalog_has_at_least_thirty_source_backed_rivne_venues(self):
+        self.assertGreaterEqual(len(RIVNE_CATALOG), 30)
+
+    def test_catalog_loader_is_idempotent_and_preserves_orders(self):
+        user = get_user_model().objects.create_user(
+            username="catalog-test-user",
+            email="catalog-test@example.com",
+            password="TestPass123!",
+        )
+        legacy_restaurant = create_restaurant(name="Legacy Restaurant")
+        order = Order.objects.create(
+            client=user,
+            restaurant=legacy_restaurant,
+            total_price=Decimal("100.00"),
+            street="Soborna Street",
+            building="1",
+        )
+
         output = StringIO()
-        call_command("seed_db", stdout=output)
+        call_command("load_rivne_catalog", stdout=output)
         counts = (
             Restaurant.objects.count(),
             OpeningHours.objects.count(),
             MenuItem.objects.count(),
         )
-        call_command("seed_db", stdout=output)
+        call_command("load_rivne_catalog", stdout=output)
 
         self.assertEqual(
             counts,
@@ -352,12 +387,48 @@ class SeedAndMigrationTests(TestCase):
                 MenuItem.objects.count(),
             ),
         )
-        self.assertEqual(OpeningHours.objects.count(), Restaurant.objects.count() * 2)
-        self.assertTrue(MenuItem.objects.filter(is_available=True).exists())
-        self.assertTrue(MenuItem.objects.filter(is_available=False).exists())
-        self.assertTrue(MenuItem.objects.filter(calories__isnull=False).exists())
-        self.assertFalse(Restaurant.objects.filter(image_url__contains="example.com").exists())
-        self.assertFalse(MenuItem.objects.filter(image_url="").exists())
+        catalog_restaurant = Restaurant.objects.get(
+            catalog_key="brovarnia-na-hrushevskoho"
+        )
+        self.assertEqual(catalog_restaurant.address, "вулиця Академіка Грушевського, 77, Рівне")
+        self.assertEqual(catalog_restaurant.latitude, Decimal("50.617499"))
+        self.assertEqual(catalog_restaurant.longitude, Decimal("26.273941"))
+        self.assertTrue(Order.objects.filter(pk=order.pk).exists())
+        self.assertTrue(Restaurant.objects.filter(pk=legacy_restaurant.pk).exists())
+        self.assertFalse(MenuItem.objects.filter(name__icontains="demo").exists())
+        self.assertFalse(Restaurant.objects.filter(image_url__contains="picsum.photos").exists())
+
+    def test_catalog_loader_dry_run_does_not_write_records(self):
+        output = StringIO()
+
+        call_command("load_rivne_catalog", "--dry-run", stdout=output)
+
+        self.assertFalse(Restaurant.objects.filter(catalog_key__isnull=False).exists())
+        self.assertIn("Dry run complete", output.getvalue())
+
+    def test_retire_legacy_catalog_deactivates_fixtures_without_deleting_orders(self):
+        user = get_user_model().objects.create_user(
+            username="retire-test-user",
+            email="retire-test@example.com",
+            password="TestPass123!",
+        )
+        legacy_restaurant = create_restaurant(
+            name="Legacy Placeholder",
+            image_url="https://picsum.photos/seed/legacy/800/500",
+        )
+        order = Order.objects.create(
+            client=user,
+            restaurant=legacy_restaurant,
+            total_price=Decimal("100.00"),
+            street="Soborna Street",
+            building="1",
+        )
+
+        call_command("retire_legacy_catalog", "--apply")
+
+        legacy_restaurant.refresh_from_db()
+        self.assertFalse(legacy_restaurant.is_active)
+        self.assertTrue(Order.objects.filter(pk=order.pk).exists())
 
     def test_test_database_has_all_migration_leaf_nodes_applied(self):
         executor = MigrationExecutor(connection)
