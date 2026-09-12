@@ -107,8 +107,16 @@ const OrderLiveMap: FC<OrderLiveMapProps> = ({ order }) => {
     overlayTitle = "PICKUP IN PROGRESS";
     overlayDescription = "Courier is heading to the restaurant";
   } else if (courierStage === 'AT_RESTAURANT') {
-    overlayTitle = "AT RESTAURANT";
-    overlayDescription = "Courier is picking up your order";
+    if (order.status === 'PREPARING') {
+      overlayTitle = "AT RESTAURANT";
+      overlayDescription = "Courier arrived. Kitchen is preparing your order";
+    } else if (order.status === 'READY') {
+      overlayTitle = "AT RESTAURANT";
+      overlayDescription = "Courier is picking up your order";
+    } else {
+      overlayTitle = "AT RESTAURANT";
+      overlayDescription = "Courier has arrived at the restaurant";
+    }
   } else if (courierStage === 'TO_CUSTOMER') {
     overlayTitle = "OUT FOR DELIVERY";
     overlayDescription = "Your courier is on the way";

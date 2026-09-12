@@ -17,6 +17,9 @@ class RecommendView(APIView):
         
         query = serializer.validated_data['query']
         orchestrator = RecommendationOrchestrator()
-        result = orchestrator.process(query)
+        result = orchestrator.process(
+            query=query,
+            user=request.user,
+        )
         
         return Response(result)

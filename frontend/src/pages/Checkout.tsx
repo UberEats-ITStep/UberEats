@@ -11,11 +11,19 @@ import LocationPicker, { type ResolvedLocation } from '../features/auth/componen
 import { authApi } from '../features/auth/api/authApi';
 import type { DeliveryAddress } from '../features/auth/types/auth.types';
 import { formatPrice } from '../utils/currency';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
+import { paymentService } from '../features/payments/api/payment.service';
 
-const Checkout: FC = () => {
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || '');
+
+const CheckoutContent: FC = () => {
   const { cart, cartTotal, itemCount, refreshCart } = useCart();
   const { profile } = useAuth();
   const navigate = useNavigate();
+  
+  const stripe = useStripe();
+  const elements = useElements();
 
   const [street, setStreet] = useState(profile?.address || '');
   const [building, setBuilding] = useState('');
@@ -33,24 +41,38 @@ const Checkout: FC = () => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showSuccess, setShowSuccess] = useState(false);
 
+  const [activeClientSecret, setActiveClientSecret] = useState<string | null>(null);
+  const [activeOrderId, setActiveOrderId] = useState<number | null>(null);
+
   const applyAddress = useCallback((address: DeliveryAddress) => {
     setSelectedAddressId(address.id); setStreet(address.street); setBuilding(address.building);
     setApartment(address.apartment); setEntrance(address.entrance); setFloor(address.floor ?? '');
     setDeliveryNotes(address.delivery_notes); setContactPhone(address.contact_phone || profile?.phone_number || '');
     if (address.latitude && address.longitude) setCoordinates({ latitude: Number(address.latitude), longitude: Number(address.longitude) });
   }, [profile?.phone_number]);
+  
   useEffect(() => { authApi.getAddresses().then((items) => { setSavedAddresses(items); const preferred = items.find((item) => item.is_default) || items[0]; if (preferred) applyAddress(preferred); }).catch(() => undefined); }, [applyAddress]);
   const resolveLocation = (location: ResolvedLocation) => { setSelectedAddressId(null); setStreet(location.street); setBuilding(location.building); setCoordinates({ latitude: location.latitude, longitude: location.longitude }); };
 
-  if (isSubmitting || showSuccess) {
+  const handlePaymentSuccess = async () => {
+    await refreshCart();
+    setShowSuccess(true);
+    setTimeout(() => {
+      navigate('/orders', { state: { successMessage: 'Order placed successfully!' } });
+    }, 1500);
+  };
+
+  if (showSuccess) {
     return (
       <SectionContainer width="content" padding="lg" className="min-h-[70vh] flex items-center justify-center">
-        <OrderPlacementAnimation isSuccess={showSuccess} />
+        <OrderPlacementAnimation isSuccess={true} />
       </SectionContainer>
     );
   }
 
-  if (!cart || cart.items.length === 0) {
+  // If we already have a client secret, we are in the payment retry state.
+  // The cart may be empty on the backend because checkout succeeded, but we should not block the user.
+  if (!activeClientSecret && (!cart || cart.items.length === 0)) {
     return (
       <SectionContainer width="content" padding="lg">
         <EmptyState
@@ -68,6 +90,8 @@ const Checkout: FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!stripe || !elements) return;
+
     const errors: Record<string, string> = {};
     if (!street.trim()) errors.street = 'Street is required.';
     if (!building.trim()) errors.building = 'Building / house number is required.';
@@ -79,29 +103,93 @@ const Checkout: FC = () => {
       return;
     }
 
+    // Validate the Stripe elements first before placing the order
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      setError(submitError.message || 'Payment validation failed.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    setFieldErrors({});
+
+    let createdOrderId = activeOrderId;
+
     try {
-      setIsSubmitting(true);
-      setError(null);
-      setFieldErrors({});
-      await orderService.checkout({
-        street: street.trim(),
-        building: building.trim(),
-        apartment: apartment.trim(),
-        entrance: entrance.trim(),
-        floor: floor === '' ? null : Number(floor),
-        delivery_notes: deliveryNotes.trim(),
-        contact_phone: contactPhone.trim(),
-        delivery_latitude: coordinates.latitude.toFixed(6),
-        delivery_longitude: coordinates.longitude.toFixed(6)
+      let client_secret = activeClientSecret;
+      
+      if (!client_secret) {
+        // 1. Create order
+        const order = await orderService.checkout({
+          street: street.trim(),
+          building: building.trim(),
+          apartment: apartment.trim(),
+          entrance: entrance.trim(),
+          floor: floor === '' ? null : Number(floor),
+          delivery_notes: deliveryNotes.trim(),
+          contact_phone: contactPhone.trim(),
+          delivery_latitude: coordinates.latitude.toFixed(6),
+          delivery_longitude: coordinates.longitude.toFixed(6)
+        });
+        createdOrderId = order.id;
+        setActiveOrderId(order.id);
+        
+        // 2. Create Payment Intent based on the order
+        const intentResult = await paymentService.createIntent(order.id);
+        client_secret = intentResult.client_secret;
+        setActiveClientSecret(client_secret);
+      }
+      
+      // 3. Confirm Payment (Elements MUST remain mounted in DOM)
+      const { error: confirmError } = await stripe.confirmPayment({
+        elements,
+        clientSecret: client_secret,
+        confirmParams: {
+          return_url: `${window.location.origin}/orders?payment_intent=success`,
+        },
+        redirect: 'if_required',
       });
+
+      if (confirmError) {
+        console.error('Stripe payment confirmation error:', confirmError);
+
+        const declineMessage = 'The payment was declined. See details in your bank provider.';
+
+        // Immediately notify backend to decline the unpaid order and preserve user's cart
+        if (createdOrderId) {
+          try {
+            await paymentService.reportFailure(createdOrderId, declineMessage);
+          } catch (reportErr) {
+            console.warn('Failed to report payment cancellation to backend:', reportErr);
+          }
+        }
+        await refreshCart();
+        setActiveClientSecret(null);
+        setActiveOrderId(null);
+
+        setError(declineMessage);
+        setIsSubmitting(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        await handlePaymentSuccess();
+      }
       
-      await refreshCart();
-      
-      setShowSuccess(true);
-      setTimeout(() => {
-        navigate('/orders', { state: { successMessage: 'Order placed successfully!' } });
-      }, 1500);
     } catch (err: unknown) {
+      console.error('Checkout error:', err);
+
+      if (createdOrderId) {
+        try {
+          await paymentService.reportFailure(createdOrderId, 'Checkout exception occurred');
+        } catch (reportErr) {
+          console.warn('Failed to report payment cancellation to backend:', reportErr);
+        }
+      }
+      await refreshCart();
+      setActiveClientSecret(null);
+      setActiveOrderId(null);
+
       const httpErr = err as { response?: { data?: Record<string, string[]> } };
       const data = httpErr.response?.data;
 
@@ -123,6 +211,8 @@ const Checkout: FC = () => {
         }
         setFieldErrors(newFieldErrors);
         setError(topError);
+      } else if (err instanceof Error) {
+        setError(err.message);
       } else {
         setError('Failed to place order. Please try again.');
       }
@@ -132,7 +222,7 @@ const Checkout: FC = () => {
     }
   };
 
-  const summaryItems: SummaryItem[] = cart.items.map((item) => ({
+  const summaryItems: SummaryItem[] = (cart?.items || []).map((item) => ({
     id: item.id,
     name: item.menu_item_detail.name,
     quantity: item.quantity,
@@ -140,7 +230,13 @@ const Checkout: FC = () => {
   }));
 
   return (
-    <SectionContainer width="content" padding="lg" className="pb-16">
+    <SectionContainer width="content" padding="lg" className="pb-16 relative">
+      {isSubmitting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-sm">
+          <OrderPlacementAnimation isSuccess={false} />
+        </div>
+      )}
+
       <div className="mb-6">
         <Link to="/" className="text-sm font-medium text-text-secondary hover:text-accent">
           ← Back to browsing
@@ -150,8 +246,6 @@ const Checkout: FC = () => {
       <h1 className="text-page-title mb-8">Checkout</h1>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-        
-        {/* Checkout Form */}
         <div className="lg:col-span-7 xl:col-span-8 space-y-6">
           <Card elevation="subtle" padding="md">
             <h2 className="text-xl font-bold text-text-primary mb-6">Delivery Details</h2>
@@ -164,7 +258,6 @@ const Checkout: FC = () => {
 
             {savedAddresses.length > 0 && <div className="mb-8"><p className="text-caption">Deliver to</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{savedAddresses.map((address) => <button type="button" key={address.id} onClick={() => applyAddress(address)} className={`p-4 text-left border transition-base ${selectedAddressId === address.id ? 'border-2 border-primary bg-secondary' : 'border-border-default hover:border-text-muted'}`}><span className="flex items-center justify-between gap-2 font-bold"><span>{address.label}</span><span>{selectedAddressId === address.id ? '●' : '○'}</span></span><span className="mt-2 block text-sm text-text-secondary">{address.formatted_address}</span>{address.is_default && <span className="mt-2 block text-[10px] uppercase tracking-widest">Default address</span>}</button>)}</div><Link to="/profile" className="mt-3 inline-block text-sm font-medium underline underline-offset-4">+ Add new address</Link></div>}
 
-            {/* Interactive Map Picker */}
             <div className="mb-8">
               <h3 className="text-lg font-bold text-text-primary mb-1">Pinpoint Location</h3>
               <p className="text-sm text-text-secondary mb-4">Drag the map to your location, then click "Confirm" to auto-fill your address.</p>
@@ -177,23 +270,10 @@ const Checkout: FC = () => {
               
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField label="Street" id="street" required error={fieldErrors.street}>
-                  <Input
-                    id="street"
-                    value={street}
-                    onChange={(e) => setStreet(e.target.value)}
-                    placeholder="Soborna Street"
-                    required
-                  />
+                  <Input id="street" value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Soborna Street" required />
                 </FormField>
-
                 <FormField label="Building / House #" id="building" required error={fieldErrors.building}>
-                  <Input
-                    id="building"
-                    value={building}
-                    onChange={(e) => setBuilding(e.target.value)}
-                    placeholder="15A"
-                    required
-                  />
+                  <Input id="building" value={building} onChange={(e) => setBuilding(e.target.value)} placeholder="15A" required />
                 </FormField>
               </div>
 
@@ -201,11 +281,9 @@ const Checkout: FC = () => {
                 <FormField label="Apartment" id="apartment" optionalLabel>
                   <Input id="apartment" value={apartment} onChange={(e) => setApartment(e.target.value)} placeholder="42" />
                 </FormField>
-
                 <FormField label="Entrance" id="entrance" optionalLabel>
                   <Input id="entrance" value={entrance} onChange={(e) => setEntrance(e.target.value)} placeholder="2" />
                 </FormField>
-
                 <FormField label="Floor" id="floor" optionalLabel>
                   <Input id="floor" type="number" value={floor === '' ? '' : String(floor)} onChange={(e) => setFloor(e.target.value === '' ? '' : Number(e.target.value))} placeholder="5" />
                 </FormField>
@@ -218,17 +296,15 @@ const Checkout: FC = () => {
               <FormField label="Contact Phone" id="contact_phone" optionalLabel error={fieldErrors.contact_phone}>
                 <Input id="contact_phone" type="tel" inputMode="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+380501234567" />
               </FormField>
-            </form>
-          </Card>
 
-          {/* Placeholders for future extensibility */}
-          <Card elevation="subtle" padding="md" className="opacity-70 pointer-events-none">
-            <h2 className="text-lg font-bold text-text-primary mb-4">Payment Method</h2>
-            <p className="text-sm text-text-muted">Payment is handled securely upon delivery.</p>
+              <div className="border-t border-border-default pt-8 mt-8">
+                <h3 className="text-lg font-bold text-text-primary mb-4">Payment Method</h3>
+                <PaymentElement options={{ layout: 'tabs' }} />
+              </div>
+            </form>
           </Card>
         </div>
 
-        {/* Order Summary */}
         <div className="lg:col-span-5 xl:col-span-4">
           <div className="sticky top-24">
             <Card elevation="subtle" padding="md">
@@ -259,14 +335,44 @@ const Checkout: FC = () => {
                 variant="accent"
                 fullWidth
                 size="lg"
+                disabled={!stripe || isSubmitting}
               >
-                Place Order
+                {isSubmitting ? 'Processing...' : 'Place Order'}
               </Button>
             </Card>
           </div>
         </div>
       </div>
     </SectionContainer>
+  );
+};
+
+const Checkout: FC = () => {
+  const { cartTotal } = useCart();
+  
+  // Use a fallback for amount if cartTotal is 0 or empty to prevent Elements from throwing.
+  const amount = cartTotal > 0 ? Math.round(cartTotal * 100) : 100;
+
+  return (
+    <Elements 
+      stripe={stripePromise} 
+      options={{ 
+        mode: 'payment',
+        amount,
+        currency: 'uah',
+        appearance: { 
+          theme: 'stripe',
+          variables: {
+            colorPrimary: '#191918',
+            colorBackground: '#ffffff',
+            colorText: '#191918',
+            fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          }
+        }
+      }}
+    >
+      <CheckoutContent />
+    </Elements>
   );
 };
 
