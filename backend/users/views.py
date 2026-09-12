@@ -19,6 +19,12 @@ from .serializers import (
     ChangePasswordSerializer,
 )
 from .services.password_reset import PasswordResetService
+from .services.firebase_auth import (
+    FirebaseAccountConflict,
+    FirebaseAuthenticationError,
+    resolve_firebase_user,
+    verify_firebase_id_token,
+)
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -30,6 +36,34 @@ class RegisterView(generics.CreateAPIView):
 class LoginView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
     throttle_scope = 'auth_login'
+
+
+class FirebaseLoginView(APIView):
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "auth_firebase"
+
+    def post(self, request):
+        try:
+            identity = verify_firebase_id_token(request.data.get("id_token"))
+            user = resolve_firebase_user(identity)
+        except FirebaseAuthenticationError as error:
+            return Response(
+                {"detail": str(error)},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        except FirebaseAccountConflict as error:
+            return Response(
+                {"detail": str(error)},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        })
 
 
 class ForgotPasswordView(APIView):
