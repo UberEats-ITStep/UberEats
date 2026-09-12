@@ -8,6 +8,7 @@ import type {
 } from '../features/auth/types/auth.types';
 import { AuthContext } from './AuthContext';
 import { AUTH_LOGOUT_EVENT } from '../api/client';
+import { signInWithGoogle, signOutFromFirebase } from '../features/auth/firebase';
 
 export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -46,6 +47,17 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     await loginWithTokens(access, refresh);
   };
 
+  const loginWithGoogle = async () => {
+    const idToken = await signInWithGoogle();
+    try {
+      const { access, refresh } = await authApi.loginWithFirebase(idToken);
+      await loginWithTokens(access, refresh);
+    } catch (error) {
+      await signOutFromFirebase();
+      throw error;
+    }
+  };
+
   const loginWithTokens = async (access: string, refresh: string) => {
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
@@ -63,8 +75,14 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     await authApi.register(credentials);
   };
 
-  const logout = () => {
+  const logout = async () => {
     clearSession();
+    try {
+      await signOutFromFirebase();
+    } catch {
+      // The local Django session is already cleared. Firebase will retry its
+      // persisted state synchronization when connectivity returns.
+    }
   };
 
   const refreshProfile = async () => {
@@ -80,6 +98,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         isAuthenticated: profile !== null,
         isLoading,
         login,
+        loginWithGoogle,
         loginWithTokens,
         register,
         logout,

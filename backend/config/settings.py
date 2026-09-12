@@ -232,6 +232,7 @@ REST_FRAMEWORK = {
         "ai_recommend": "5/min",
         "auth_login": "10/min",
         "auth_register": "5/min",
+        "auth_firebase": "10/min",
         "verify_email": "10/hour",
         "resend_verification": "3/hour",
         "password_reset_request": os.getenv(
@@ -311,3 +312,11 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama3-70b-8192")
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', 'sk_test_mock')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', 'whsec_mock')
 PAYMENT_CURRENCY = os.getenv('PAYMENT_CURRENCY', 'uah')
+
+# Firebase proves identity; Django remains responsible for users, permissions,
+# profiles, and application API sessions.
+FIREBASE_AUTH_ENABLED = environment_flag("FIREBASE_AUTH_ENABLED", "false")
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+GOOGLE_APPLICATION_CREDENTIALS_JSON = os.getenv(
+    "GOOGLE_APPLICATION_CREDENTIALS_JSON", ""
+)

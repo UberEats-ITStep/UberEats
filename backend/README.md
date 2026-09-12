@@ -34,6 +34,20 @@ them, and apply committed migrations with:
 DATABASE_URL='<DIRECT_OWNER_URL>' python manage.py migrate --noinput
 ```
 
+This is a temporary environment override for that one command; do not replace
+the pooled `neondb_user` URL in `.env`. The normal workflow for every future
+migration is therefore:
+
+```bash
+cd backend
+source .venv/bin/activate
+DATABASE_URL='<DIRECT_OWNER_URL>' python manage.py migrate --noinput
+```
+
+Retrieve the direct owner URL from Neon or the team's secret manager. Never
+paste it into source code, commit it, or save it in shell history on a shared
+machine.
+
 Do not run `makemigrations` automatically during deployment. Developers who
 only run the application should use a restricted runtime role. The migration
 role owns the schema; keep its URL in CI/deployment secrets rather than `.env`.
@@ -90,6 +104,36 @@ python manage.py test restaurants --keepdb
 ```
 
 ## Authentication endpoints
+
+### Firebase / Google authentication
+
+Firebase proves the user's identity; Django remains the source of truth for the
+user, profile, permissions, orders, favorites, reviews, and addresses. The
+frontend sends a Firebase ID token to `POST /api/auth/firebase/`; after server-
+side verification, Django returns the same SimpleJWT access and refresh tokens
+used by password login.
+
+Backend-only configuration:
+
+```dotenv
+FIREBASE_AUTH_ENABLED=true
+FIREBASE_PROJECT_ID=bite-up
+GOOGLE_APPLICATION_CREDENTIALS_JSON=<complete-service-account-json>
+```
+
+The service-account JSON is a private credential. Keep it only in `.env` or the
+deployment provider's secret store and never expose it as a `VITE_*` variable.
+The Firebase UID is uniquely linked to a Django user. A Firebase-verified email
+may link an existing account without replacing its password or profile data;
+conflicting UID/email mappings are rejected.
+
+After pulling the Firebase integration, install requirements and apply the
+committed migration before starting the backend:
+
+```bash
+pip install -r requirements.txt
+python manage.py migrate
+```
 
 ### Register
 

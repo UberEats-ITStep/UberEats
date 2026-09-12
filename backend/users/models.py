@@ -16,6 +16,7 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='CLIENT')
     created_at = models.DateTimeField(auto_now_add=True)
     is_verified = models.BooleanField(default=False)
+    firebase_uid = models.CharField(max_length=128, unique=True, null=True, blank=True)
     
     # Require email for authentication
     USERNAME_FIELD = 'email'
