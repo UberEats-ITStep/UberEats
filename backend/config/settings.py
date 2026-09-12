@@ -29,15 +29,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
-def required_environment(name):
-    value = os.getenv(name)
-    if not value:
+def required_environment(name, default=None):
+    value = os.getenv(name, default)
+    if value is None:
         raise ImproperlyConfigured(f"{name} must be set.")
     return value
 
 
-def environment_flag(name):
-    value = required_environment(name).lower()
+def environment_flag(name, default="false"):
+    value = required_environment(name, default).lower()
     if value not in {"true", "false"}:
         raise ImproperlyConfigured(f"{name} must be either true or false.")
     return value == "true"
@@ -50,11 +50,11 @@ def environment_flag(name):
 SECRET_KEY = required_environment("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = environment_flag("DJANGO_DEBUG")
+DEBUG = environment_flag("DJANGO_DEBUG", "true")
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in required_environment("DJANGO_ALLOWED_HOSTS").split(",")
+    for host in required_environment("DJANGO_ALLOWED_HOSTS", "*").split(",")
     if host.strip()
 ]
 
@@ -79,18 +79,18 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
     "corsheaders",
+    "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
-    # --- APPS ---
-    "restaurants",
-    "favorites",
-    "orders",
+    "django_filters",
     "users",
+    "restaurants",
+    "orders",
+    "favorites",
     "cart",
     "reviews",
-    "django_filters",
+    "ai",
 ]
 
 MIDDLEWARE = [
@@ -113,6 +113,7 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
+                "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
@@ -127,31 +128,16 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-USE_SQLITE_FOR_DEVELOPMENT = (
-    environment_flag("DJANGO_USE_SQLITE")
-)
-
-if USE_SQLITE_FOR_DEVELOPMENT:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": required_environment("DJANGO_SQLITE_PATH"),
-        }
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("POSTGRES_DB", "mydb"),
+        "USER": os.getenv("POSTGRES_USER", "postgres"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "12345"),
+        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
+        "PORT": os.getenv("POSTGRES_PORT", "5432"),
     }
-elif {"test", "makemigrations"} & set(sys.argv):
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": ":memory:",
-        }
-    }
-else:
-    try:
-        DATABASES = {
-            "default": add_connection_safety(database_config_from_environment())
-        }
-    except DatabaseConfigurationError as error:
-        raise ImproperlyConfigured(str(error)) from error
+}
 
 
 # Password validation
@@ -190,14 +176,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-CORS_ALLOW_ALL_ORIGINS = (
-    DEBUG and environment_flag("CORS_ALLOW_ALL_ORIGINS")
-)
-CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in required_environment("CORS_ALLOWED_ORIGINS").split(",")
-    if origin.strip()
-]
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 AUTH_USER_MODEL = "users.User"
