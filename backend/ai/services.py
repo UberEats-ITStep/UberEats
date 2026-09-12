@@ -1,21 +1,29 @@
 import json
 import logging
+from typing import Optional
+
 import requests
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Q
 from rest_framework.exceptions import APIException
+
 from restaurants.models import MenuItem
+
+from .prompts import INTENT_EXTRACTION_PROMPT, RECOMMENDATION_PROMPT
+from .serializers import ExtractedIntentSerializer, LLMRecommendationResponseSerializer
+from .tools import registry as tool_registry
+from .tools.errors import ToolError
 from .user_context import UserContextBuilder
 
-from .serializers import ExtractedIntentSerializer, LLMRecommendationResponseSerializer
-from .prompts import INTENT_EXTRACTION_PROMPT, RECOMMENDATION_PROMPT
-
 logger = logging.getLogger(__name__)
+
 
 class GroqAPIException(APIException):
     status_code = 503
     default_detail = "The recommendation service is temporarily unavailable."
     default_code = "service_unavailable"
+
 
 class GroqClient:
     def __init__(self):
@@ -59,20 +67,75 @@ class GroqClient:
             logger.error(f"Unexpected Groq error: {str(e)}")
             raise GroqAPIException()
 
+
+class VocabularyProvider:
+    """
+    Builds a short summary of BiteUp's real vocabulary (tags/cuisines/
+    categories) via the MCP/tool layer, so intent extraction is grounded
+    in what actually exists instead of assumptions baked into the prompt.
+
+    This is the concrete fix for the "AI has no way to discover what
+    BiteUp actually contains" problem: a handful of read-only tool calls
+    made once per (cached) window, not an agent loop.
+
+    Tool failures never break recommendation: on any ToolError this
+    falls back to an empty vocabulary and the pipeline behaves exactly
+    as it did before the tool layer existed.
+    """
+
+    CACHE_KEY = "ai:vocabulary:v1"
+    CACHE_TTL_SECONDS = 300
+
+    def __init__(self, registry=None):
+        self.registry = registry or tool_registry
+
+    def get(self) -> dict:
+        cached = cache.get(self.CACHE_KEY)
+        if cached is not None:
+            return cached
+
+        vocabulary = {"tags": [], "cuisines": [], "categories": []}
+        try:
+            tags = self.registry.call("get_available_tags", {})["data"]["tags"]
+            cuisines = self.registry.call("get_available_cuisines", {})["data"]["cuisines"]
+            categories = self.registry.call("get_available_categories", {})["data"]["categories"]
+            vocabulary = {
+                "tags": [t["name"] for t in tags],
+                "cuisines": [c["name"] for c in cuisines],
+                "categories": [c["name"] for c in categories],
+            }
+        except ToolError as exc:
+            logger.warning(
+                "Vocabulary tool call failed, falling back to empty vocabulary: %s", exc
+            )
+
+        cache.set(self.CACHE_KEY, vocabulary, self.CACHE_TTL_SECONDS)
+        return vocabulary
+
+
 class IntentExtractor:
     def __init__(self, client=None):
         self.client = client or GroqClient()
 
-    def extract(self, query: str) -> dict:
+    def extract(self, query: str, vocabulary: Optional[dict] = None) -> dict:
+        user_content = f"USER REQUEST: {query}"
+        if vocabulary and any(vocabulary.values()):
+            user_content += (
+                "\n\nKNOWN VOCABULARY (BiteUp's actual tags/cuisines/categories - "
+                "prefer these values; do not invent ones that aren't listed):\n"
+                f"{json.dumps(vocabulary, ensure_ascii=False)}"
+            )
+
         raw_json = self.client.chat_completion(
             system_prompt=INTENT_EXTRACTION_PROMPT,
-            user_content=f"USER REQUEST: {query}"
+            user_content=user_content
         )
         serializer = ExtractedIntentSerializer(data=raw_json)
         if serializer.is_valid():
             return serializer.validated_data
         logger.warning(f"Extracted intent validation failed: {serializer.errors}")
         return ExtractedIntentSerializer().to_representation({}) # Return empty defaults
+
 
 class CandidateRetriever:
     def retrieve(self, intent: dict) -> list:
@@ -121,6 +184,7 @@ class CandidateRetriever:
             })
         return results
 
+
 class CandidateRanker:
     def __init__(self, client=None):
         self.client = client or GroqClient()
@@ -165,6 +229,7 @@ class CandidateRanker:
 
         raise GroqAPIException()
 
+
 class RecommendationOrchestrator:
     def __init__(self, client=None):
         self.client = client or GroqClient()
@@ -172,11 +237,14 @@ class RecommendationOrchestrator:
         self.retriever = CandidateRetriever()
         self.ranker = CandidateRanker(self.client)
         self.user_context_builder = UserContextBuilder()
+        self.vocabulary_provider = VocabularyProvider()
 
     def process(self, query: str, user) -> dict:
         logger.info(f"AI Recommend started for query: '{query}'")
 
-        intent = self.extractor.extract(query)
+        vocabulary = self.vocabulary_provider.get()
+
+        intent = self.extractor.extract(query, vocabulary=vocabulary)
         logger.info(f"Extracted Intent: {intent}")
 
         user_context = self.user_context_builder.build(user)
