@@ -50,3 +50,16 @@ class DatabaseConfigurationTests(SimpleTestCase):
             "Set DATABASE_URL or the required PostgreSQL variables",
         ):
             database_config_from_environment({"POSTGRES_DB": "ubereats"})
+
+    def test_connection_safety_has_serverless_default(self):
+        config = add_connection_safety({}, {})
+
+        self.assertEqual(config["CONN_MAX_AGE"], 0)
+        self.assertTrue(config["CONN_HEALTH_CHECKS"])
+        self.assertTrue(config["DISABLE_SERVER_SIDE_CURSORS"])
+
+    def test_invalid_connection_max_age_is_rejected(self):
+        with self.assertRaisesRegex(
+            DatabaseConfigurationError, "DATABASE_CONN_MAX_AGE must be an integer"
+        ):
+            add_connection_safety({}, {"DATABASE_CONN_MAX_AGE": "forever"})

@@ -9,16 +9,58 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Update `.env` with your PostgreSQL credentials, then create the database named by `POSTGRES_DB`.
+Copy `.env.example` to `.env` and add local secrets. `.env` is ignored by Git
+and must never be committed.
 
-For Neon, set `DATABASE_URL` to the TLS connection string from the Neon
-dashboard, including `sslmode=require`. It takes priority over `POSTGRES_*`.
-Set `DJANGO_DEBUG=false`, a non-default `DJANGO_SECRET_KEY`,
-`DJANGO_ALLOWED_HOSTS`, and `CORS_ALLOWED_ORIGINS` in production. The
-application enables PostgreSQL connection health checks and starts with
-`DATABASE_CONN_MAX_AGE=0`, which avoids reusing a connection after a Neon
-compute wakes from idle. Production enables secure cookies and HTTPS redirect;
-set `DJANGO_BEHIND_HTTPS_PROXY=true` when TLS terminates at a trusted reverse
+### Shared Neon database
+
+Normal development and deployed web processes use the pooled Neon connection:
+
+```dotenv
+DATABASE_URL=postgresql://ROLE:PASSWORD@HOST-POOLER/DATABASE?sslmode=require&channel_binding=require
+DATABASE_CONN_MAX_AGE=0
+```
+
+Get the real value from the Neon **Connect** dialog or the team's secret
+manager. Never expose it through a `VITE_*` variable or frontend code. The
+application preserves the URL's TLS options, checks connection health, and
+disables server-side cursors for PgBouncer compatibility.
+
+Use Neon's direct connection (the hostname does not contain `-pooler`) for
+schema migrations. Generate and commit migrations during development, review
+them, and apply committed migrations with:
+
+```bash
+DATABASE_URL='<DIRECT_OWNER_URL>' python manage.py migrate --noinput
+```
+
+Do not run `makemigrations` automatically during deployment. Developers who
+only run the application should use a restricted runtime role. The migration
+role owns the schema; keep its URL in CI/deployment secrets rather than `.env`.
+
+Recommended grants, executed in the Neon SQL Editor as `neondb_owner` after
+creating the `neondb_user` role:
+
+```sql
+GRANT CONNECT ON DATABASE biteupdb TO neondb_user;
+GRANT USAGE ON SCHEMA public TO neondb_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO neondb_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO neondb_user;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO neondb_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO neondb_user;
+```
+
+Do not grant `neondb_user` `CREATE` on the schema, `CREATEDB`, `CREATEROLE`, or
+ownership. Use its pooled URL for the application and the direct owner URL only
+for migrations.
+
+In production, also set `DJANGO_DEBUG=false`, a unique `DJANGO_SECRET_KEY`,
+explicit `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, and
+`CSRF_TRUSTED_ORIGINS`. Production enables secure cookies and HTTPS redirect;
+set `DJANGO_BEHIND_HTTPS_PROXY=true` only behind a trusted TLS-terminating
 proxy. Restaurant open-state evaluation uses the `Europe/Kyiv` timezone.
 
 For a temporary local run without PostgreSQL, set `DJANGO_USE_SQLITE=true` in
@@ -26,7 +68,6 @@ For a temporary local run without PostgreSQL, set `DJANGO_USE_SQLITE=true` in
 for Neon or production.
 
 ```bash
-python manage.py makemigrations users restaurants orders
 python manage.py migrate
 python manage.py runserver
 ```

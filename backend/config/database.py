@@ -8,7 +8,7 @@ class DatabaseConfigurationError(ValueError):
 
 def database_config_from_environment(environment=None):
     """Return a Django PostgreSQL config from DATABASE_URL or POSTGRES_* values."""
-    environment = environment or environ
+    environment = environ if environment is None else environment
     database_url = environment.get("DATABASE_URL")
 
     if database_url:
@@ -67,18 +67,26 @@ def database_config_from_environment(environment=None):
         "PASSWORD": environment["POSTGRES_PASSWORD"],
         "HOST": environment["POSTGRES_HOST"],
         "PORT": environment["POSTGRES_PORT"],
-        "OPTIONS": {
-            "sslmode": environment["POSTGRES_SSLMODE"],
-        },
+        "OPTIONS": {"sslmode": environment.get("POSTGRES_SSLMODE", "prefer")},
     }
 
 
 def add_connection_safety(database_config, environment=None):
     """Apply safe defaults for serverless PostgreSQL connections such as Neon."""
-    environment = environment or environ
+    environment = environ if environment is None else environment
+    try:
+        connection_max_age = int(environment.get("DATABASE_CONN_MAX_AGE", "0"))
+    except ValueError as error:
+        raise DatabaseConfigurationError(
+            "DATABASE_CONN_MAX_AGE must be an integer number of seconds."
+        ) from error
+    if connection_max_age < 0:
+        raise DatabaseConfigurationError(
+            "DATABASE_CONN_MAX_AGE must be zero or a positive integer."
+        )
     database_config.update(
         {
-            "CONN_MAX_AGE": int(environment["DATABASE_CONN_MAX_AGE"]),
+            "CONN_MAX_AGE": connection_max_age,
             "CONN_HEALTH_CHECKS": True,
             "DISABLE_SERVER_SIDE_CURSORS": True,
         }

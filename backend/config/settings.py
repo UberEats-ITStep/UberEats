@@ -57,6 +57,10 @@ ALLOWED_HOSTS = [
     for host in required_environment("DJANGO_ALLOWED_HOSTS", "*").split(",")
     if host.strip()
 ]
+if not DEBUG and (not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS):
+    raise ImproperlyConfigured(
+        "DJANGO_ALLOWED_HOSTS must list explicit hostnames in production."
+    )
 
 if not DEBUG:
     SECURE_SSL_REDIRECT = environment_flag("DJANGO_SECURE_SSL_REDIRECT")
@@ -129,16 +133,22 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "mydb"),
-        "USER": os.getenv("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "12345"),
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+if environment_flag("DJANGO_USE_SQLITE", "false"):
+    if not DEBUG:
+        raise ImproperlyConfigured("DJANGO_USE_SQLITE is only allowed in debug mode.")
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
+else:
+    try:
+        DATABASES = {
+            "default": add_connection_safety(database_config_from_environment())
+        }
+    except DatabaseConfigurationError as error:
+        raise ImproperlyConfigured(str(error)) from error
 
 
 # Password validation
@@ -177,8 +187,20 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-CORS_ALLOW_ALL_ORIGINS = True
+configured_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+CORS_ALLOW_ALL_ORIGINS = DEBUG and not configured_cors_origins
+CORS_ALLOWED_ORIGINS = configured_cors_origins
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 
 AUTH_USER_MODEL = "users.User"
 
