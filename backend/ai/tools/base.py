@@ -49,6 +49,13 @@ class BaseTool:
     def validate(self, arguments):
         if not self.input_serializer_class:
             return arguments or {}
+        unknown_fields = set(arguments or {}) - set(
+            self.input_serializer_class().fields
+        )
+        if unknown_fields:
+            raise ToolValidationError(
+                {field: ["Unknown field."] for field in sorted(unknown_fields)}
+            )
         serializer = self.input_serializer_class(data=arguments or {})
         if not serializer.is_valid():
             raise ToolValidationError(serializer.errors)

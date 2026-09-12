@@ -1,3 +1,4 @@
+import os
 from decimal import Decimal
 from unittest.mock import patch
 from unittest import skipUnless
@@ -157,7 +158,10 @@ class AIRecommendTests(APITestCase):
     # BASIC RECOMMENDATION
     # =============================================================
 
-    @skipUnless(settings.GROQ_API_KEY, "GROQ_API_KEY is not configured")
+    @skipUnless(
+        settings.GROQ_API_KEY and os.getenv("RUN_GROQ_INTEGRATION_TESTS") == "1",
+        "Set GROQ_API_KEY and RUN_GROQ_INTEGRATION_TESTS=1 to run",
+    )
     def test_temporary_real_groq_recommendation(self):
         self.client.force_authenticate(user=self.user)
 
@@ -1771,6 +1775,14 @@ class EntityToolsTests(DomainToolsTestCase):
 
 
 class ToolValidationTests(DomainToolsTestCase):
+    def test_tool_rejects_unknown_arguments(self):
+        with self.assertRaises(ToolValidationError):
+            registry.call(
+                "get_user_order_history",
+                {"user_id": self.user.id},
+                context=self.context,
+            )
+
     def test_tool_rejects_invalid_argument_type(self):
         with self.assertRaises(ToolValidationError):
             registry.call(
@@ -1808,6 +1820,50 @@ class ToolAuthorizationTests(DomainToolsTestCase):
                 {},
                 context=anonymous_context,
             )
+
+    def test_order_history_rejects_django_anonymous_user(self):
+        from django.contrib.auth.models import AnonymousUser
+
+        with self.assertRaises(ToolUnauthorizedError):
+            registry.call(
+                "get_user_order_history",
+                {},
+                context=ToolContext(user=AnonymousUser()),
+            )
+
+    def test_order_history_returns_only_context_users_orders(self):
+        other_user = User.objects.create_user(
+            username="other_tool_user",
+            email="other-tool@test.com",
+            password="password123",
+        )
+        own_order = Order.objects.create(
+            client=self.user,
+            restaurant=self.restaurant,
+            status=Order.STATUS_COMPLETED,
+            total_price=Decimal("150.00"),
+            street="Main Street",
+            building="1",
+        )
+        Order.objects.create(
+            client=other_user,
+            restaurant=self.restaurant,
+            status=Order.STATUS_COMPLETED,
+            total_price=Decimal("200.00"),
+            street="Other Street",
+            building="2",
+        )
+
+        result = registry.call(
+            "get_user_order_history",
+            {},
+            context=self.context,
+        )
+
+        self.assertEqual(
+            [order["id"] for order in result["data"]["orders"]],
+            [own_order.id],
+        )
 
 
 # =============================================================
@@ -1952,6 +2008,16 @@ class VocabularyProviderTests(TestCase):
         )
 
     @patch("ai.services.tool_registry.call")
+    def test_vocabulary_falls_back_on_malformed_tool_response(self, mock_call):
+        mock_call.return_value = {"data": {}}
+
+        self.assertEqual(
+            VocabularyProvider().get(),
+            {"tags": [], "cuisines": [], "categories": []},
+        )
+        self.assertIsNone(cache.get(VocabularyProvider.CACHE_KEY))
+
+    @patch("ai.services.tool_registry.call")
     def test_each_vocabulary_tool_is_called_with_empty_arguments(
         self,
         mock_call,
@@ -2084,4 +2150,4 @@ class IntentVocabularyIntegrationTests(TestCase):
             dict,
         )
 
-        mock_chat_completion.assert_called_once() 
+        mock_chat_completion.assert_called_once()

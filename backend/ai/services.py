@@ -104,10 +104,13 @@ class VocabularyProvider:
                 "cuisines": [c["name"] for c in cuisines],
                 "categories": [c["name"] for c in categories],
             }
-        except ToolError as exc:
+        except (ToolError, KeyError, TypeError) as exc:
             logger.warning(
-                "Vocabulary tool call failed, falling back to empty vocabulary: %s", exc
+                "Vocabulary tool call failed or returned malformed data; "
+                "falling back to empty vocabulary: %s",
+                exc,
             )
+            return vocabulary
 
         cache.set(self.CACHE_KEY, vocabulary, self.CACHE_TTL_SECONDS)
         return vocabulary

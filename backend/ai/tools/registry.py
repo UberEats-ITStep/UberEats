@@ -40,7 +40,10 @@ class ToolRegistry:
         """
         tool = self.get(name)
 
-        if tool.requires_user_context and (context is None or context.user is None):
+        user = getattr(context, "user", None)
+        if tool.requires_user_context and (
+            user is None or not getattr(user, "is_authenticated", False)
+        ):
             raise ToolUnauthorizedError(
                 f"Tool '{name}' requires an authenticated user context."
             )
