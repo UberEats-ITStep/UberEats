@@ -9,6 +9,7 @@ import {
   firebaseAuthErrorMessage,
   isFirebaseAuthEnabled,
 } from '../firebase';
+import GoogleIcon from './GoogleIcon';
 
 const LoginForm: FC = () => {
   const navigate = useNavigate();
@@ -184,6 +185,7 @@ const LoginForm: FC = () => {
             variant="outline"
             size="lg"
             fullWidth
+            leftIcon={<GoogleIcon className="h-5 w-5" />}
             isLoading={isGoogleSubmitting}
             disabled={isSubmitting}
             onClick={handleGoogleLogin}

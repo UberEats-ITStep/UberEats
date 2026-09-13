@@ -1,7 +1,6 @@
 from os import environ
 from urllib.parse import parse_qs, unquote, urlparse
 
-
 class DatabaseConfigurationError(ValueError):
     """Raised when DATABASE_URL is not a valid PostgreSQL connection URL."""
 
