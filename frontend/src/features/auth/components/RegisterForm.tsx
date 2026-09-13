@@ -4,10 +4,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../hooks/useAuth";
 import { getAuthError } from "../utils/getAuthError";
 import { Card, FormField, Input, Button, Alert } from "../../../components/common";
+import {
+  firebaseAuthErrorMessage,
+  isFirebaseAuthEnabled,
+} from "../firebase";
+import GoogleIcon from "./GoogleIcon";
 
 const RegisterForm: FC = () => {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -19,6 +24,7 @@ const RegisterForm: FC = () => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [requestError, setRequestError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   const validate = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -79,6 +85,21 @@ const RegisterForm: FC = () => {
       setRequestError(getAuthError(error, "Unable to create your account. Please try again."));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    setIsGoogleSubmitting(true);
+    setRequestError("");
+
+    try {
+      await loginWithGoogle();
+      navigate("/", { replace: true });
+    } catch (error) {
+      const backendMessage = getAuthError(error, "");
+      setRequestError(backendMessage || firebaseAuthErrorMessage(error));
+    } finally {
+      setIsGoogleSubmitting(false);
     }
   };
 
@@ -176,6 +197,28 @@ const RegisterForm: FC = () => {
           </Button>
         </div>
       </form>
+
+      {isFirebaseAuthEnabled && (
+        <div className="mt-6">
+          <div className="flex items-center gap-4 py-2" aria-hidden="true">
+            <span className="h-px flex-1 bg-border-default" />
+            <span className="text-xs uppercase tracking-widest text-text-secondary">or</span>
+            <span className="h-px flex-1 bg-border-default" />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            fullWidth
+            leftIcon={<GoogleIcon className="h-5 w-5" />}
+            isLoading={isGoogleSubmitting}
+            disabled={isSubmitting}
+            onClick={() => void handleGoogleRegister()}
+          >
+            Continue with Google
+          </Button>
+        </div>
+      )}
 
       <div className="mt-8 text-center text-sm text-text-secondary">
         <span>Already have an account? </span>
