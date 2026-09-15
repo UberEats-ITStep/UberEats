@@ -28,7 +28,6 @@ class UserContextBuilder:
             .prefetch_related(
                 "items__menu_item__category",
                 "items__menu_item__restaurant__cuisine",
-                "items__menu_item__tags",
             )
             .order_by("-created_at")[:self.MAX_ORDERS]
         )
@@ -144,10 +143,8 @@ class UserContextBuilder:
                 item_counter,
                 self.MAX_TOP_ITEMS,
             ),
-            "favorite_restaurants": self._get_favorite_restaurants(user),
-            "highly_rated_restaurants": (
-                self._get_highly_rated_restaurants(user)
-            ),
+            "favorite_restaurants": favorite_restaurants,
+            "highly_rated_restaurants": highly_rated_restaurants,
             "average_order_value": round(
                 float(average_order_value),
                 2,
@@ -261,7 +258,7 @@ class UserContextBuilder:
                 rating__gte=4,
             )
             .select_related("restaurant")
-            .order_by("-id")
+            .order_by("-id")[:self.MAX_TOP_RESTAURANTS]
         )
 
         result = []
