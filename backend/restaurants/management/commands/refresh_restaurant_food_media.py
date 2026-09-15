@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import urllib.request
 from pathlib import Path
 
@@ -26,6 +28,33 @@ KEYWORDS = {
 }
 
 
+def write_backup(payload: list[dict], requested_path: str | None) -> Path:
+    """Write a private, non-overwriting backup and return its path.
+
+    The default uses ``mkstemp`` instead of a predictable file in ``/tmp``.
+    An explicit path must not already exist, which also avoids following a
+    pre-created symlink.
+    """
+    if requested_path:
+        backup = Path(requested_path)
+        if not backup.parent.is_dir():
+            raise CommandError(f"Backup directory does not exist: {backup.parent}")
+        descriptor = os.open(
+            backup,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+    else:
+        descriptor, name = tempfile.mkstemp(
+            prefix="biteup-restaurant-media-",
+            suffix=".json",
+        )
+        backup = Path(name)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+        json.dump(payload, file, ensure_ascii=False, indent=2)
+    return backup
+
+
 def download(url: str) -> bytes:
     request = urllib.request.Request(
         url, headers={"User-Agent": "BiteUp-restaurant-cover-refresh/1.0"}
@@ -41,7 +70,10 @@ class Command(BaseCommand):
     help = "Give every restaurant a distinct cuisine-matched Cloudinary cover."
 
     def add_arguments(self, parser):
-        parser.add_argument("--backup", default="/tmp/biteup-media-backup/restaurant-image-urls.json")
+        parser.add_argument(
+            "--backup",
+            help="Optional new backup file path. Defaults to a private temporary file.",
+        )
         parser.add_argument("--manifest", default="docs/catalog-image-manifest.md")
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument("--ids", nargs="*", type=int)
@@ -61,9 +93,7 @@ class Command(BaseCommand):
             }
             for restaurant in restaurants
         ]
-        backup = Path(options["backup"])
-        backup.parent.mkdir(parents=True, exist_ok=True)
-        backup.write_text(json.dumps(before, ensure_ascii=False, indent=2), encoding="utf-8")
+        backup = write_backup(before, options["backup"])
 
         used_sources: set[str] = set()
         assignments = []

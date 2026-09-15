@@ -20,7 +20,6 @@ from pathlib import Path
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.utils.text import slugify
 
 from restaurants.models import MenuItem, Restaurant
 
@@ -180,19 +179,12 @@ def _download_existing_asset(url: str, label: str) -> Asset | None:
     )
 
 
-def _restaurant_query(cuisine: str) -> tuple[str, list[str]]:
-    queries = {
-        "Bakery": ("bakery interior", ["bakery", "interior"]),
-        "Cafe": ("cafe interior", ["cafe", "interior"]),
-        "Fast Food": ("fast food restaurant interior", ["food", "interior"]),
-        "Georgian": ("Georgian restaurant interior", ["georgian", "restaurant"]),
-        "Italian": ("Italian restaurant interior", ["italian", "restaurant"]),
-        "Japanese": ("Japanese restaurant interior", ["japanese", "restaurant"]),
-        "Pub": ("brewery pub interior", ["brewery", "interior"]),
-        "Ukrainian": ("Ukrainian restaurant interior", ["ukrainian", "interior"]),
-        "European": ("restaurant interior", ["restaurant", "interior"]),
-    }
-    return queries.get(cuisine, ("restaurant interior", ["restaurant", "interior"]))
+def _without_size_suffix(name: str) -> str:
+    normalized = name.casefold()
+    for suffix in (" (small)", " (large)"):
+        if normalized.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
 
 
 class Command(BaseCommand):
@@ -230,31 +222,16 @@ class Command(BaseCommand):
         assets: dict[str, Asset | None] = {}
         max_menu_sources = options["max_menu_sources"]
         rows: list[dict] = []
-        restaurant_assets: dict[str, Asset | None] = {}
         restaurants = list(Restaurant.objects.select_related("cuisine").order_by("id"))
         menu_items = list(
             MenuItem.objects.select_related("restaurant", "category")
             .order_by("restaurant_id", "id")
         )
-        existing_restaurant_assets: dict[str, str] = {}
-        for existing in restaurants:
-            if not existing.image:
-                continue
-            existing_restaurant_assets.setdefault(
-                existing.cuisine.name.lower(), existing.image.url
-            )
-
         existing_menu_assets: dict[str, str] = {}
-        existing_category_assets: dict[str, str] = {}
-        existing_any_menu_url = ""
         for existing in menu_items:
             if not existing.image:
                 continue
             existing_menu_assets.setdefault(existing.name.lower(), existing.image.url)
-            existing_any_menu_url = existing_any_menu_url or existing.image.url
-            existing_category_assets.setdefault(
-                existing.category.name.lower(), existing.image.url
-            )
 
         for restaurant in restaurants:
             if restaurant.image:
@@ -271,26 +248,6 @@ class Command(BaseCommand):
                 )
                 continue
 
-            cuisine = restaurant.cuisine.name
-            if cuisine not in restaurant_assets:
-                query, required_tokens = _restaurant_query(cuisine)
-                restaurant_assets[cuisine] = _fetch_asset(query, required_tokens)
-            asset = restaurant_assets[cuisine]
-            if asset is None:
-                fallback_url = existing_restaurant_assets.get(cuisine.lower())
-                asset = (
-                    _download_existing_asset(fallback_url, cuisine)
-                    if fallback_url
-                    else None
-                )
-            status = "UPLOADED_DEVELOPMENT_PLACEHOLDER" if asset else "PLACEHOLDER_REMAINING"
-            image_name = ""
-            if asset and not dry_run:
-                filename = f"{slugify(restaurant.catalog_key or restaurant.name)}.jpg"
-                with transaction.atomic():
-                    restaurant.image.save(filename, ContentFile(asset.data), save=False)
-                    restaurant.save(update_fields=["image"])
-                image_name = restaurant.image.name
             rows.append(
                 {
                     "kind": "restaurant",
@@ -298,17 +255,9 @@ class Command(BaseCommand):
                     "restaurant_id": restaurant.id,
                     "name": restaurant.name,
                     "catalog_key": restaurant.catalog_key,
-                    "status": status,
-                    "image": image_name,
-                    "asset": asset,
-                    "source_role": "generic development category image",
-                    "authorization": (
-                        "Public license recorded; not restaurant-provided"
-                        if asset and asset.license_name != "Existing project asset"
-                        else "Existing project asset reused for visual category fallback"
-                        if asset
-                        else "No source found"
-                    ),
+                    "status": "PLACEHOLDER_REMAINING",
+                    "image": "",
+                    "reason": "Restaurant covers require a curated, approved source.",
                 }
             )
 
@@ -327,17 +276,16 @@ class Command(BaseCommand):
                 )
                 continue
             cache_key = item.name.lower()
+            lookup_deferred = False
             if cache_key not in assets:
-                if max_menu_sources == 0:
+                if max_menu_sources is not None and len(assets) >= max_menu_sources:
                     assets[cache_key] = None
-                    asset = None
-                    # Continue through the existing exact/category fallback below.
-                    query_name = None
+                    lookup_deferred = True
                 else:
-                    query_name = re.sub(r"\s+\((?:small|large)\)$", "", item.name, flags=re.I)
+                    query_name = _without_size_suffix(item.name)
                     tokens = _tokens(query_name)
                     assets[cache_key] = _fetch_asset(query_name, tokens)
-                if max_menu_sources and len(assets) > max_menu_sources:
+                if lookup_deferred:
                     rows.append(
                         {
                             "kind": "menu",
@@ -358,20 +306,9 @@ class Command(BaseCommand):
                     if fallback_url
                     else None
                 )
-            if asset is None:
-                fallback_url = existing_category_assets.get(item.category.name.lower())
-                asset = (
-                    _download_existing_asset(fallback_url, item.category.name)
-                    if fallback_url
-                    else None
-                )
-            if asset is None and existing_any_menu_url:
-                asset = _download_existing_asset(existing_any_menu_url, item.category.name)
             status = "UPLOADED" if asset else "PLACEHOLDER_REMAINING"
             image_name = ""
             if asset and not dry_run:
-                # The existing database column is varchar(100), while the
-                # storage backend appends its own uniqueness suffix.
                 filename = "item.jpg"
                 with transaction.atomic():
                     item.image.save(filename, ContentFile(asset.data), save=False)

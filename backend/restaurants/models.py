@@ -87,6 +87,7 @@ class Restaurant(models.Model):
     description = models.TextField(blank=True, default="")
     image = models.ImageField(
         upload_to=restaurant_image_upload_path,
+        max_length=255,
         null=True,
         blank=True,
         validators=IMAGE_VALIDATORS,
@@ -232,6 +233,7 @@ class MenuItem(models.Model):
     )
     image = models.ImageField(
         upload_to=menu_item_image_upload_path,
+        max_length=255,
         null=True,
         blank=True,
         validators=IMAGE_VALIDATORS,
