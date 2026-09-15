@@ -31,6 +31,7 @@ class OrderSerializer(serializers.ModelSerializer):
     restaurant_name = serializers.SerializerMethodField()
     restaurant_latitude = serializers.DecimalField(source='restaurant.latitude', max_digits=9, decimal_places=6, read_only=True)
     restaurant_longitude = serializers.DecimalField(source='restaurant.longitude', max_digits=9, decimal_places=6, read_only=True)
+    restaurant_image_url = serializers.SerializerMethodField()
     review_id = serializers.SerializerMethodField()
 
     class Meta:
@@ -52,6 +53,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'items',
             'restaurant',
             'restaurant_name',
+            'restaurant_image_url',
             'restaurant_latitude',
             'restaurant_longitude',
             'courier',
@@ -61,6 +63,13 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_review_id(self, obj):
         review = getattr(obj, 'review', None)
         return review.id if review else None
+
+    def get_restaurant_image_url(self, obj):
+        if getattr(obj, 'restaurant', None):
+            # If the image field exists on the restaurant model
+            # Note: image_url is typically a property on the model returning the S3/storage URL or raw field
+            return obj.restaurant.image_url if hasattr(obj.restaurant, 'image_url') else None
+        return None
 
     def get_restaurant_name(self, obj):
         # Prefer the snapshot stored at checkout; fall back to the live restaurant name for existing records
@@ -187,12 +196,25 @@ class CheckoutSerializer(serializers.Serializer):
             if missing_fields:
                 raise serializers.ValidationError(missing_fields)
 
-        if not hasattr(user, 'cart') or not user.cart.items.exists():
+        if not hasattr(user, 'cart'):
             raise serializers.ValidationError({
                 'non_field_errors': 'Your cart is empty.'
             })
 
-        items = user.cart.items.select_related('menu_item')
+        items = list(user.cart.items.select_related('menu_item__restaurant'))
+        if not items:
+            raise serializers.ValidationError({
+                'non_field_errors': 'Your cart is empty.'
+            })
+
+        if any(not item.menu_item.restaurant.is_active for item in items):
+            raise serializers.ValidationError({
+                'non_field_errors': 'Your cart contains a restaurant that is not accepting orders.'
+            })
+        if any(not item.menu_item.is_available for item in items):
+            raise serializers.ValidationError({
+                'non_field_errors': 'Your cart contains an unavailable item.'
+            })
 
         restaurant_ids = {
             item.menu_item.restaurant_id

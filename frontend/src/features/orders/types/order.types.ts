@@ -10,6 +10,7 @@ export type OrderStatus =
 export interface OrderItem {
     id: number;
     menu_item: number;
+    /** Historical name captured when the order was placed. */
     menu_item_name?: string;
     quantity: number;
     price: string;
@@ -31,7 +32,9 @@ export interface Order {
     delivery_latitude?: string | null;
     delivery_longitude?: string | null;
     restaurant: number | null;
+    /** Historical name captured when the order was placed. */
     restaurant_name?: string;
+    restaurant_image_url?: string | null;
     restaurant_latitude?: string | null;
     restaurant_longitude?: string | null;
     items: OrderItem[];

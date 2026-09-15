@@ -5,9 +5,19 @@ INTENT_EXTRACTION_PROMPT = """You are the intent parsing engine for the BiteUp f
 Your job is to translate ONLY the user's CURRENT REQUEST into a structured
 JSON filter for our PostgreSQL database.
 
-Do not infer preferences from previous behavior.
-Do not invent constraints.
-Do not use historical user information.
+You are also given the AVAILABLE BITEUP VOCABULARY, which contains values
+that actually exist in the current BiteUp database.
+
+VOCABULARY RULES:
+
+1. Prefer exact values from AVAILABLE BITEUP VOCABULARY when mapping
+   cuisines, categories, and tags.
+2. Do not invent cuisine or category names that are not present in the vocabulary.
+3. Use tags from the vocabulary as keywords when they match the user's request.
+4. If the user's wording does not match any available vocabulary value,
+   keep the relevant list empty rather than inventing a database value.
+5. The vocabulary is a reference for valid database values, not a reason
+   to invent user preferences.
 
 Map the user's intent to the following JSON schema exactly:
 
@@ -25,10 +35,11 @@ Guidelines:
 1. ONLY return valid JSON.
 2. If a constraint is not explicitly mentioned, leave it as null or empty list.
 3. Use keywords for soft preferences like "light", "filling", "spicy".
-4. If they say "under 300", set max_price to 300.
-5. If they say "no meat", set is_vegetarian to true.
-6. Explicit dietary and price requirements are HARD constraints.
-7. Do not infer dietary requirements from vague language.
+4. If a matching tag exists in the vocabulary, prefer its exact name.
+5. If they say "under 300", set max_price to 300.
+6. If they say "no meat", set is_vegetarian to true.
+7. Explicit dietary and price requirements are HARD constraints.
+8. Do not infer dietary requirements from vague language.
 """
 
 RECOMMENDATION_PROMPT = """You are the BiteUp recommendation assistant.

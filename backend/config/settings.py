@@ -14,7 +14,14 @@ import os
 import sys
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+
+from config.database import (
+    DatabaseConfigurationError,
+    add_connection_safety,
+    database_config_from_environment,
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,19 +29,47 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
+def required_environment(name, default=None):
+    value = os.getenv(name, default)
+    if value is None:
+        raise ImproperlyConfigured(f"{name} must be set.")
+    return value
+
+
+def environment_flag(name, default="false"):
+    value = required_environment(name, default).lower()
+    if value not in {"true", "false"}:
+        raise ImproperlyConfigured(f"{name} must be either true or false.")
+    return value == "true"
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-1fznboq%1zi(aeu&e^s2u+zeipb+-*ug5%)sl-k&6mi_ed*4lr",
-)
+SECRET_KEY = required_environment("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = environment_flag("DJANGO_DEBUG", "true")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in required_environment("DJANGO_ALLOWED_HOSTS", "*").split(",")
+    if host.strip()
+]
+if not DEBUG and (not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS):
+    raise ImproperlyConfigured(
+        "DJANGO_ALLOWED_HOSTS must list explicit hostnames in production."
+    )
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = environment_flag("DJANGO_SECURE_SSL_REDIRECT")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    if environment_flag("DJANGO_BEHIND_HTTPS_PROXY"):
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -48,18 +83,19 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
     "corsheaders",
+    "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
-    # --- APPS ---
-    "restaurants",
-    "favorites",
-    "orders",
+    "django_filters",
     "users",
+    "restaurants",
+    "orders",
+    "favorites",
     "cart",
     "reviews",
-    "django_filters",
+    "ai",
+    "payments",
 ]
 
 MIDDLEWARE = [
@@ -82,6 +118,7 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
+                "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
@@ -96,22 +133,22 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "mydb"),
-        "USER": os.getenv("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "12345"),
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+if environment_flag("DJANGO_USE_SQLITE", "false"):
+    if not DEBUG:
+        raise ImproperlyConfigured("DJANGO_USE_SQLITE is only allowed in debug mode.")
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
-
-if {"test", "makemigrations"} & set(sys.argv):
-    DATABASES["default"] = {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
-    }
+else:
+    try:
+        DATABASES = {
+            "default": add_connection_safety(database_config_from_environment())
+        }
+    except DatabaseConfigurationError as error:
+        raise ImproperlyConfigured(str(error)) from error
 
 
 # Password validation
@@ -138,7 +175,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Europe/Kyiv"
 
 USE_I18N = True
 
@@ -150,41 +187,52 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-CORS_ALLOW_ALL_ORIGINS = True
+configured_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+CORS_ALLOW_ALL_ORIGINS = DEBUG and not configured_cors_origins
+CORS_ALLOWED_ORIGINS = configured_cors_origins
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 
 AUTH_USER_MODEL = "users.User"
 
 PASSWORD_RESET_CODE_TTL_SECONDS = int(
-    os.getenv('PASSWORD_RESET_CODE_TTL_SECONDS', '600')
+    os.getenv("PASSWORD_RESET_CODE_TTL_SECONDS", "600")
 )
 PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = int(
-    os.getenv('PASSWORD_RESET_RESEND_COOLDOWN_SECONDS', '60')
+    os.getenv("PASSWORD_RESET_RESEND_COOLDOWN_SECONDS", "60")
 )
 
 EMAIL_BACKEND = os.getenv(
-    'EMAIL_BACKEND',
-    'django.core.mail.backends.smtp.EmailBackend',
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend",
 )
-EMAIL_HOST = os.getenv('EMAIL_HOST', '')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'true').lower() == 'true'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@example.com')
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@example.com")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_THROTTLE_CLASSES": (
-        "rest_framework.throttling.ScopedRateThrottle",
-    ),
+    "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.ScopedRateThrottle",),
     "DEFAULT_THROTTLE_RATES": {
         "ai_recommend": "5/min",
         "auth_login": "10/min",
         "auth_register": "5/min",
+        "auth_firebase": "10/min",
         "verify_email": "10/hour",
         "resend_verification": "3/hour",
         "password_reset_request": os.getenv(
@@ -195,9 +243,9 @@ REST_FRAMEWORK = {
             "PASSWORD_RESET_CONFIRM_THROTTLE_RATE",
             "10/hour",
         ),
-        'change_password': os.getenv(
-            'CHANGE_PASSWORD_THROTTLE_RATE',
-            '5/hour',
+        "change_password": os.getenv(
+            "CHANGE_PASSWORD_THROTTLE_RATE",
+            "5/hour",
         ),
     },
 }
@@ -214,10 +262,11 @@ SIMPLE_JWT = {
 # Order Lifecycle Simulation (Development Only)
 # List of tuples: (Target Status, Delay in seconds before transitioning to it)
 ORDER_SIMULATION_TRANSITIONS = [
-    ("PREPARING", 10),
-    ("READY", 10),
-    ("DELIVERING", 10),
-    ("COMPLETED", 10),
+    ("ACCEPTED", 15),
+    ("PREPARING", 15),
+    ("READY", 15),
+    ("DELIVERING", 15),
+    ("COMPLETED", 15),
 ]
 
 # --- Email Verification ---
@@ -237,7 +286,10 @@ else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # Automatically use the Brevo verified email (SMTP_USER) as the sender if not explicitly set
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", os.getenv("SMTP_DEFAULT_FROM_EMAIL", os.getenv("SMTP_USER", "webmaster@localhost")))
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    os.getenv("SMTP_DEFAULT_FROM_EMAIL", os.getenv("SMTP_USER", "webmaster@localhost")),
+)
 
 # Cache (required for DRF Throttling)
 CACHES = {
@@ -248,11 +300,23 @@ CACHES = {
 }
 
 
-
 if {"test", "makemigrations"} & set(sys.argv):
     if "DEFAULT_THROTTLE_CLASSES" in REST_FRAMEWORK:
         REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []
 
 # AI Configuration
-GROQ_API_KEY = os.getenv('GROQ_API_KEY')
-GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama3-70b-8192')
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+
+# Stripe Configuration
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', 'sk_test_mock')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', 'whsec_mock')
+PAYMENT_CURRENCY = os.getenv('PAYMENT_CURRENCY', 'uah')
+
+# Firebase proves identity; Django remains responsible for users, permissions,
+# profiles, and application API sessions.
+FIREBASE_AUTH_ENABLED = environment_flag("FIREBASE_AUTH_ENABLED", "false")
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+GOOGLE_APPLICATION_CREDENTIALS_JSON = os.getenv(
+    "GOOGLE_APPLICATION_CREDENTIALS_JSON", ""
+)

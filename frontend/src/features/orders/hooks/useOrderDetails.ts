@@ -59,5 +59,9 @@ export const useOrderDetails = (orderId?: string) => {
     return () => controller.abort();
   }, [isValidId, numericOrderId]);
 
-  return { order, isLoading, error, backgroundError, reload: (isBackground = false) => void reload(isBackground) };
+  const handleReload = useCallback((isBackground = false) => {
+    void reload(isBackground);
+  }, [reload]);
+
+  return { order, isLoading, error, backgroundError, reload: handleReload };
 };

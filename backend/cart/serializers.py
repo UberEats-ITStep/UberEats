@@ -35,6 +35,14 @@ class CartItemSerializer(serializers.ModelSerializer):
         menu_item = attrs.get("menu_item", self.instance.menu_item if self.instance else None)
 
         if cart and menu_item:
+            if not menu_item.restaurant.is_active:
+                raise serializers.ValidationError({
+                    "menu_item": "This restaurant is not currently accepting orders."
+                })
+            if not menu_item.is_available:
+                raise serializers.ValidationError({
+                    "menu_item": "This menu item is currently unavailable."
+                })
             if cart.restaurant and menu_item.restaurant != cart.restaurant:
                 raise serializers.ValidationError(
                     "Cart can contain items from only one restaurant."

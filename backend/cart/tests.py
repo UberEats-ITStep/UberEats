@@ -155,6 +155,39 @@ class CartApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_cannot_add_unavailable_menu_item(self) -> None:
+        self.burger.is_available = False
+        self.burger.unavailable_reason = "Sold out"
+        self.burger.save()
+
+        response = cast(
+            Response,
+            self.client.post(
+                self.url,
+                {"cart": self.cart.id, "menu_item": self.burger.id, "quantity": 1},
+                format="json",
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("menu_item", response.data)
+
+    def test_cannot_add_item_from_inactive_restaurant(self) -> None:
+        self.restaurant1.is_active = False
+        self.restaurant1.save(update_fields=["is_active"])
+
+        response = cast(
+            Response,
+            self.client.post(
+                self.url,
+                {"cart": self.cart.id, "menu_item": self.burger.id, "quantity": 1},
+                format="json",
+            ),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("menu_item", response.data)
+
     def test_can_add_second_item_from_same_restaurant(self) -> None:
         fries = MenuItem.objects.create(
             restaurant=self.restaurant1,

@@ -23,6 +23,13 @@ class FavoriteSerializer(serializers.ModelSerializer):
             )
         ]
 
+    def validate_restaurant(self, value):
+        if not value.is_active:
+            raise serializers.ValidationError(
+                "This restaurant is not currently available."
+            )
+        return value
+
     def create(self, validated_data):
         try:
             with transaction.atomic():

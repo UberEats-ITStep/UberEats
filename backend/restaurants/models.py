@@ -49,6 +49,13 @@ class MenuTag(models.Model):
 
 
 class Restaurant(models.Model):
+    catalog_key = models.SlugField(
+        max_length=80,
+        unique=True,
+        null=True,
+        blank=True,
+        editable=False,
+    )
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
     image = models.ImageField(
@@ -81,6 +88,7 @@ class Restaurant(models.Model):
         null=True, blank=True,
         validators=[MinValueValidator(1)],
     )
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):

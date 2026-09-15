@@ -88,7 +88,7 @@ const OrderHistory: FC = () => {
 
         const intervalId = window.setInterval(() => {
             void loadOrders(true);
-        }, 10000);
+        }, 5000);
 
         return () => window.clearInterval(intervalId);
     }, [orders, loadOrders]);

@@ -13,11 +13,7 @@ interface SimulationOptions {
 }
 
 export function useCourierSimulation({ order, isActive }: SimulationOptions) {
-  const [courierPosition, setCourierPosition] = useState<[number, number] | null>(null);
-  const [routeA, setRouteA] = useState<GeoJSON.Feature<GeoJSON.LineString> | null>(null);
-  const [routeB, setRouteB] = useState<GeoJSON.Feature<GeoJSON.LineString> | null>(null);
-  const [courierStage, setCourierStage] = useState<CourierStage>('PREPARING');
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
+  const storageKey = `courier_sim_order_${order.id}`;
 
   // Memoize stable coordinates
   const startPoint = useMemo(() => {
@@ -39,6 +35,72 @@ export function useCourierSimulation({ order, isActive }: SimulationOptions) {
     // 1.5 km away
     return destination(startPoint, 1.5, bearing, { units: 'kilometers' }).geometry.coordinates as [number, number];
   }, [startPoint, order.id]);
+
+  const getInitialProgressA = (): number => {
+    if (['ACCEPTED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED'].includes(order.status)) {
+      return 1;
+    }
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.hasReachedRestaurant || parsed.progressA >= 1) return 1;
+        if (typeof parsed.progressA === 'number') return parsed.progressA;
+      }
+    } catch {
+      // Ignore sessionStorage errors
+    }
+    if (order.created_at) {
+      const elapsed = (Date.now() - new Date(order.created_at).getTime()) / 1000;
+      if (elapsed >= 15) return 1;
+      if (elapsed > 0) return Math.min(1, elapsed / 15);
+    }
+    return 0;
+  };
+
+  const getInitialProgressB = (): number => {
+    if (order.status === 'COMPLETED') return 1;
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.progressB === 'number') return parsed.progressB;
+      }
+    } catch {
+      // Ignore sessionStorage errors
+    }
+    return 0;
+  };
+
+  const progressA = useRef<number>(getInitialProgressA());
+  const progressB = useRef<number>(getInitialProgressB());
+  const hasReachedRestaurant = useRef<boolean>(progressA.current >= 1);
+  const lastFrameTime = useRef(Date.now());
+  const animationFrameRef = useRef<number | null>(null);
+
+  const getInitialStage = (): CourierStage => {
+    if (order.status === 'CANCELLED') return 'CANCELLED';
+    if (order.status === 'COMPLETED') return 'ARRIVED';
+    if (order.status === 'DELIVERING') return 'TO_CUSTOMER';
+    if (hasReachedRestaurant.current || ['ACCEPTED', 'PREPARING', 'READY'].includes(order.status)) {
+      return 'AT_RESTAURANT';
+    }
+    return 'TO_RESTAURANT';
+  };
+
+  const getInitialPosition = (): [number, number] | null => {
+    if (order.status === 'COMPLETED' && endPoint) return endPoint;
+    if ((hasReachedRestaurant.current || ['ACCEPTED', 'PREPARING', 'READY'].includes(order.status)) && startPoint) {
+      return startPoint;
+    }
+    return courierStart;
+  };
+
+  const [courierPosition, setCourierPosition] = useState<[number, number] | null>(getInitialPosition);
+  const [routeA, setRouteA] = useState<GeoJSON.Feature<GeoJSON.LineString> | null>(null);
+  const [routeB, setRouteB] = useState<GeoJSON.Feature<GeoJSON.LineString> | null>(null);
+  const [courierStage, setCourierStage] = useState<CourierStage>(getInitialStage);
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
 
   // Fetch routes
   useEffect(() => {
@@ -92,23 +154,29 @@ export function useCourierSimulation({ order, isActive }: SimulationOptions) {
     return () => { isMounted = false; };
   }, [courierStart?.[0], courierStart?.[1], startPoint?.[0], startPoint?.[1], endPoint?.[0], endPoint?.[1]]);
 
-  // Animation Refs
-  const progressA = useRef(0);
-  const progressB = useRef(0);
-  const lastFrameTime = useRef(Date.now());
-  const animationFrameRef = useRef<number | null>(null);
-
-  // Jump progress based on backend status
+  // Sync state if order status changes externally
   useEffect(() => {
-    if (order.status === 'DELIVERING' && progressA.current < 1) {
-      // Force completion of Stage A if backend says we are already delivering
+    if (['ACCEPTED', 'PREPARING', 'READY', 'DELIVERING', 'COMPLETED'].includes(order.status)) {
       progressA.current = 1;
+      hasReachedRestaurant.current = true;
     }
-  }, [order.status]);
+    if (order.status === 'COMPLETED') {
+      progressB.current = 1;
+      setCourierStage('ARRIVED');
+      if (endPoint) setCourierPosition(endPoint);
+    } else if (order.status === 'CANCELLED') {
+      setCourierStage('CANCELLED');
+    } else if (order.status === 'DELIVERING') {
+      setCourierStage('TO_CUSTOMER');
+    } else if (['ACCEPTED', 'PREPARING', 'READY'].includes(order.status)) {
+      setCourierStage('AT_RESTAURANT');
+      if (startPoint) setCourierPosition(startPoint);
+    }
+  }, [order.status, startPoint, endPoint]);
 
   // Main Simulation Loop
   useEffect(() => {
-    if (!isActive || !routeA || !routeB || !startPoint || !endPoint || !courierStart) {
+    if (!isActive || !startPoint || !endPoint || !courierStart) {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
       return;
     }
@@ -121,6 +189,8 @@ export function useCourierSimulation({ order, isActive }: SimulationOptions) {
     if (order.status === 'COMPLETED') {
       setCourierStage('ARRIVED');
       setCourierPosition(endPoint);
+      progressA.current = 1;
+      progressB.current = 1;
       return;
     }
 
@@ -133,31 +203,79 @@ export function useCourierSimulation({ order, isActive }: SimulationOptions) {
       const delta = now - lastFrameTime.current;
       lastFrameTime.current = now;
 
-      if (progressA.current < 1) {
+      // Stage 1: Heading to restaurant (only while in PENDING and courier hasn't arrived)
+      if (progressA.current < 1 && !hasReachedRestaurant.current && order.status === 'PENDING') {
         setCourierStage('TO_RESTAURANT');
         // Courier travels to restaurant (15s simulation duration)
         progressA.current += delta / 15000;
-        if (progressA.current >= 1) progressA.current = 1;
-        
-        const len = length(routeA);
-        const pos = along(routeA, progressA.current * len).geometry.coordinates;
-        setCourierPosition(pos as [number, number]);
+        if (progressA.current >= 1) {
+          progressA.current = 1;
+          hasReachedRestaurant.current = true;
+        }
+
+        if (routeA) {
+          const len = length(routeA);
+          const pos = along(routeA, progressA.current * len).geometry.coordinates;
+          setCourierPosition(pos as [number, number]);
+        } else {
+          setCourierPosition(courierStart);
+        }
+
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({
+            progressA: progressA.current,
+            progressB: progressB.current,
+            hasReachedRestaurant: hasReachedRestaurant.current
+          }));
+        } catch {
+          // ignore
+        }
       } 
-      else if (progressA.current >= 1 && order.status !== 'DELIVERING') {
-        // Reached restaurant, waiting for backend to hit DELIVERING
+      // Stage 2: Arrived and stationary at the restaurant (waiting for food / order preparation)
+      else if (order.status !== 'DELIVERING') {
+        progressA.current = 1;
+        hasReachedRestaurant.current = true;
         setCourierStage('AT_RESTAURANT');
         setCourierPosition(startPoint);
+
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({
+            progressA: 1,
+            progressB: progressB.current,
+            hasReachedRestaurant: true
+          }));
+        } catch {
+          // ignore
+        }
       }
-      else if (progressA.current >= 1 && order.status === 'DELIVERING') {
+      // Stage 3: Out for delivery to customer
+      else if (order.status === 'DELIVERING') {
+        progressA.current = 1;
+        hasReachedRestaurant.current = true;
         setCourierStage('TO_CUSTOMER');
+
         // Courier travels to customer (30s simulation duration)
         progressB.current += delta / 30000;
         if (progressB.current >= 1) progressB.current = 1;
 
-        const len = length(routeB);
-        // clamp to 0.999 to avoid exactly hitting the end before backend is COMPLETED
-        const pos = along(routeB, Math.min(progressB.current, 0.999) * len).geometry.coordinates;
-        setCourierPosition(pos as [number, number]);
+        if (routeB) {
+          const len = length(routeB);
+          // Clamp to 0.999 to avoid exactly hitting the end before backend is COMPLETED
+          const pos = along(routeB, Math.min(progressB.current, 0.999) * len).geometry.coordinates;
+          setCourierPosition(pos as [number, number]);
+        } else {
+          setCourierPosition(startPoint);
+        }
+
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({
+            progressA: 1,
+            progressB: progressB.current,
+            hasReachedRestaurant: true
+          }));
+        } catch {
+          // ignore
+        }
       }
 
       animationFrameRef.current = requestAnimationFrame(animate);
@@ -169,7 +287,7 @@ export function useCourierSimulation({ order, isActive }: SimulationOptions) {
       isAnimating = false;
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [isActive, order.status, routeA, routeB, startPoint, endPoint, courierStart]);
+  }, [isActive, order.status, routeA, routeB, startPoint, endPoint, courierStart, storageKey]);
 
   return {
     courierPosition,

@@ -131,6 +131,28 @@ class FavoriteApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_inactive_restaurant_cannot_be_favorited_or_checked(self):
+        self.restaurant.is_active = False
+        self.restaurant.save(update_fields=["is_active"])
+        Favorite.objects.create(user=self.user, restaurant=self.restaurant)
+        self.authenticate()
+
+        create_response = self.client.post(
+            self.list_url,
+            {"restaurant": self.restaurant.id},
+            format="json",
+        )
+        list_response = self.client.get(self.list_url)
+        check_response = self.client.get(
+            reverse("favorite-check"),
+            {"restaurant": self.restaurant.id},
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data, [])
+        self.assertEqual(check_response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_list_contains_only_authenticated_users_favorites(self):
         Favorite.objects.create(user=self.user, restaurant=self.restaurant)
         Favorite.objects.create(

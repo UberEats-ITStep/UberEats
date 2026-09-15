@@ -2,7 +2,6 @@ import type { FC } from 'react';
 import { Link } from 'react-router-dom';
 import type { Order } from '../types/order.types';
 import { Card } from '../../../components/common';
-import { useRestaurantDetails } from '../../restaurants/hooks/useRestaurantDetails';
 import { formatPrice } from '../../../utils/currency';
 import { formatOrderDate, LIFECYCLE_STEPS, getActiveStepIndex } from '../utils/order.utils';
 
@@ -12,21 +11,11 @@ interface OrderCardProps {
 }
 
 const OrderCard: FC<OrderCardProps> = ({ order, isActive = false }) => {
-    const { restaurant, isLoading } = useRestaurantDetails(order.restaurant?.toString());
-
-    const showPlaceholder = !restaurant?.image_url;
+    const restaurantName = order.restaurant_name?.trim() || 'Restaurant unavailable';
+    const itemNames = order.items.map((item) => item.menu_item_name?.trim() || 'Item unavailable');
     const isCancelled = order.status === 'CANCELLED';
     const activeIndex = getActiveStepIndex(order.status);
     const activeStep = LIFECYCLE_STEPS[activeIndex];
-
-    if (isLoading) {
-        return (
-            <Card className="animate-pulse p-6 border border-border-default rounded-none">
-                <div className="h-16 w-full bg-muted mb-4"></div>
-                <div className="h-4 w-1/2 bg-muted"></div>
-            </Card>
-        );
-    }
 
     if (isActive) {
         return (
@@ -43,10 +32,10 @@ const OrderCard: FC<OrderCardProps> = ({ order, isActive = false }) => {
                             <h2 className="text-4xl font-serif italic text-text-primary truncate">
                                 {order.restaurant ? (
                                     <Link to={`/restaurants/${order.restaurant}`} className="hover:opacity-80 transition-opacity">
-                                        {restaurant?.name ?? 'Restaurant'}
+                                        {restaurantName}
                                     </Link>
                                 ) : (
-                                    'Restaurant'
+                                    restaurantName
                                 )}
                             </h2>
                         </div>
@@ -84,7 +73,10 @@ const OrderCard: FC<OrderCardProps> = ({ order, isActive = false }) => {
                     {/* Footer */}
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="text-sm text-text-secondary">
-                            {order.items.length} items • Placed {formatOrderDate(order.created_at)}
+                            <p>{order.items.length} items • Placed {formatOrderDate(order.created_at)}</p>
+                            {itemNames.length > 0 && (
+                                <p className="mt-1 text-text-muted">{itemNames.join(', ')}</p>
+                            )}
                         </div>
                         <Link
                             to={`/orders/${order.id}`}
@@ -104,26 +96,29 @@ const OrderCard: FC<OrderCardProps> = ({ order, isActive = false }) => {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-5 w-full sm:w-auto">
                     <div className="h-16 w-16 shrink-0 overflow-hidden bg-muted border-l border-b border-border-default">
-                        {showPlaceholder ? (
+                        {order.restaurant_image_url ? (
+                            <img 
+                                src={order.restaurant_image_url} 
+                                alt={restaurantName}
+                                className={`h-full w-full object-cover transition-all duration-500 hover:scale-105 ${isCancelled ? 'grayscale opacity-70' : 'grayscale hover:grayscale-0'}`}
+                            />
+                        ) : (
                             <div className="flex h-full w-full items-center justify-center bg-primary text-surface opacity-50 font-serif italic text-[10px] tracking-widest">
                                 BiteUp
                             </div>
-                        ) : (
-                            <img 
-                                src={restaurant.image_url} 
-                                alt={restaurant.name}
-                                className={`h-full w-full object-cover transition-all duration-500 hover:scale-105 ${isCancelled ? 'grayscale opacity-70' : 'grayscale hover:grayscale-0'}`}
-                            />
                         )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-1">
                             <h2 className="text-lg font-bold text-text-primary truncate">
-                                {restaurant?.name ?? 'Restaurant'}
+                                {restaurantName}
                             </h2>
                             {isCancelled && <span className="text-[10px] uppercase font-bold tracking-widest text-error">Cancelled</span>}
                         </div>
                         <p className="text-sm text-text-secondary mb-2">{formatOrderDate(order.created_at)}</p>
+                        {itemNames.length > 0 && (
+                            <p className="mb-2 text-sm text-text-muted line-clamp-2">{itemNames.join(', ')}</p>
+                        )}
                         <p className="text-sm font-medium text-text-primary">{formatPrice(order.total_price)} • {order.items.length} items</p>
                     </div>
                 </div>

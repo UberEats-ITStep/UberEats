@@ -32,7 +32,11 @@ class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ["id"]
 
     def get_queryset(self):
-        queryset = Restaurant.objects.select_related("cuisine").prefetch_related("opening_hours")
+        queryset = (
+            Restaurant.objects.filter(is_active=True)
+            .select_related("cuisine")
+            .prefetch_related("opening_hours")
+        )
 
         if self.action == "retrieve":
             return queryset.prefetch_related(
@@ -56,7 +60,11 @@ class CategoryCRUD(viewsets.ModelViewSet):
 
 
 class MenuItemCRUD(viewsets.ModelViewSet):
-    queryset = MenuItem.objects.order_by("id").select_related("restaurant", "category")
+    queryset = (
+        MenuItem.objects.filter(restaurant__is_active=True)
+        .order_by("id")
+        .select_related("restaurant", "category")
+    )
     serializer_class = MenuItemSerializer
     pagination_class = StandardPagination
 
