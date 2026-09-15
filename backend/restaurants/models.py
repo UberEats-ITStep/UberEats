@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from django.db import models
 from django.utils import timezone
@@ -18,6 +19,32 @@ DEFAULT_MENU_ITEM_IMAGE_URL = getattr(
     settings, "DEFAULT_MENU_ITEM_IMAGE_URL", "/static/images/placeholders/menu_item.png"
 )
 IMAGE_VALIDATORS = [validate_image_extension, validate_image_size, validate_image_integrity]
+
+
+def _image_extension(filename):
+    return Path(filename).suffix.lower() or ".jpg"
+
+
+def restaurant_image_upload_path(instance, filename):
+    folder = instance.catalog_key or slugify(instance.name) or "restaurant"
+    return f"biteup/restaurants/{folder}/cover{_image_extension(filename)}"
+
+
+def menu_item_image_upload_path(instance, filename):
+    restaurant_key = (
+        instance.restaurant.catalog_key
+        or slugify(instance.restaurant.name)
+        or f"restaurant-{instance.restaurant_id}"
+    )
+    item_key = instance.slug or slugify(instance.name) or f"menu-item-{instance.pk or 'new'}"
+    # Keep the stored Cloudinary name within the existing ImageField varchar
+    # limit after the storage backend adds its uniqueness suffix.
+    item_key = item_key[:45]
+    return (
+        f"biteup/menu-items/{restaurant_key}/"
+        f"{item_key}{_image_extension(filename)}"
+    )
+
 
 class Cuisine(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -59,7 +86,7 @@ class Restaurant(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
     image = models.ImageField(
-        upload_to="restaurants/%Y/%m/",
+        upload_to=restaurant_image_upload_path,
         null=True,
         blank=True,
         validators=IMAGE_VALIDATORS,
@@ -204,7 +231,7 @@ class MenuItem(models.Model):
         validators=[MinValueValidator(Decimal("0.01"))],
     )
     image = models.ImageField(
-        upload_to="menu_items/%Y/%m/",
+        upload_to=menu_item_image_upload_path,
         null=True,
         blank=True,
         validators=IMAGE_VALIDATORS,

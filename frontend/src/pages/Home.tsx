@@ -21,6 +21,17 @@ const EMPTY_FILTERS: RestaurantFilterValues = {
   ordering: '',
 };
 
+const shuffleRestaurants = (restaurants: Restaurant[]): Restaurant[] => {
+  const shuffled = [...restaurants];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  return shuffled;
+};
+
 const Home: FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -58,7 +69,7 @@ const Home: FC = () => {
           minRating: activeFilters.minRating ? Number(activeFilters.minRating) : undefined,
           ordering: activeFilters.ordering,
         }, controller.signal);
-        setRestaurants(data);
+        setRestaurants(shuffleRestaurants(data));
       } catch {
         if (!controller.signal.aborted) {
           setRequestError('We could not load restaurants right now. Please try again.');
