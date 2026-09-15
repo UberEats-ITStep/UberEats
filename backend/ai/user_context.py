@@ -1,12 +1,13 @@
 from collections import Counter
 from decimal import Decimal
 
-from django.apps import apps
-
 from orders.models import Order
+from favorites.models import Favorite
+from reviews.models import Review
 
 
 class UserContextBuilder:
+    MAX_ORDERS = 50
     MAX_TOP_ITEMS = 5
     MAX_TOP_RESTAURANTS = 5
     MAX_TOP_CUISINES = 5
@@ -14,23 +15,26 @@ class UserContextBuilder:
     MAX_RECENT_ORDERS = 5
 
     def build(self, user):
-        favorite_restaurants = self._get_favorite_restaurants(user)
-        highly_rated_restaurants = self._get_highly_rated_restaurants(user)
         orders = list(
             Order.objects
             .filter(
                 client=user,
                 status=Order.STATUS_COMPLETED,
             )
-            .select_related("restaurant")
+            .select_related(
+                "restaurant",
+                "restaurant__cuisine",
+            )
             .prefetch_related(
                 "items__menu_item__category",
                 "items__menu_item__restaurant__cuisine",
             )
-            .order_by("-created_at")
+            .order_by("-created_at")[:self.MAX_ORDERS]
         )
 
-        review_count = self._get_review_count(user)
+        review_count = Review.objects.filter(client=user).count()
+        favorite_restaurants = self._get_favorite_restaurants(user)
+        highly_rated_restaurants = self._get_highly_rated_restaurants(user)
 
         if not orders:
             context = self._empty_context()
@@ -38,7 +42,9 @@ class UserContextBuilder:
             context["favorite_restaurants"] = favorite_restaurants
             context["highly_rated_restaurants"] = highly_rated_restaurants
             context["has_history"] = bool(
-                review_count or favorite_restaurants
+                review_count
+                or favorite_restaurants
+                or highly_rated_restaurants
             )
             return context
 
@@ -121,46 +127,36 @@ class UserContextBuilder:
             "has_history": True,
             "completed_order_count": len(orders),
             "review_count": review_count,
-
             "top_cuisines": self._top_counter(
                 cuisine_counter,
                 self.MAX_TOP_CUISINES,
             ),
-
             "top_categories": self._top_counter(
                 category_counter,
                 self.MAX_TOP_CATEGORIES,
             ),
-
             "top_restaurants": self._top_counter(
                 restaurant_counter,
                 self.MAX_TOP_RESTAURANTS,
             ),
-
             "top_menu_items": self._top_counter(
                 item_counter,
                 self.MAX_TOP_ITEMS,
             ),
-
             "favorite_restaurants": favorite_restaurants,
-
             "highly_rated_restaurants": highly_rated_restaurants,
-
             "average_order_value": round(
                 float(average_order_value),
                 2,
             ),
-
             "typical_price_range": self._calculate_price_range(
                 order_values
             ),
-
             "dietary_preferences": self._build_dietary_preferences(
                 vegetarian_count,
                 vegan_count,
                 purchased_item_count,
             ),
-
             "recent_orders": recent_orders,
         }
 
@@ -169,25 +165,20 @@ class UserContextBuilder:
             "has_history": False,
             "completed_order_count": 0,
             "review_count": 0,
-
             "top_cuisines": [],
             "top_categories": [],
             "top_restaurants": [],
             "top_menu_items": [],
-
             "favorite_restaurants": [],
             "highly_rated_restaurants": [],
-
             "average_order_value": None,
             "typical_price_range": [None, None],
-
             "dietary_preferences": {
                 "vegetarian_ratio": 0,
                 "vegan_ratio": 0,
                 "vegetarian_tendency": False,
                 "vegan_tendency": False,
             },
-
             "recent_orders": [],
         }
 
@@ -242,165 +233,55 @@ class UserContextBuilder:
             "vegan_tendency": vegan_ratio >= 0.60,
         }
 
-    def _get_review_count(self, user):
-        review_model = self._find_model("Review")
-
-        if review_model is None:
-            return 0
-
-        user_field = self._find_user_field(review_model)
-
-        if user_field is None:
-            return 0
-
-        try:
-            return review_model.objects.filter(
-                **{user_field: user}
-            ).count()
-        except Exception:
-            return 0
-
     def _get_favorite_restaurants(self, user):
-        favorite_model = self._find_model("Favorite")
-
-        if favorite_model is None:
-            return []
-
-        try:
-            favorites = (
-                favorite_model.objects
-                .filter(user=user)
-                .select_related("restaurant")
-                .order_by("-created_at")
-            )
-
-            result = []
-
-            for favorite in favorites:
-                restaurant = favorite.restaurant
-
-                if restaurant is None:
-                    continue
-
-                result.append({
-                    "id": restaurant.id,
-                    "name": restaurant.name,
-                })
-
-                if len(result) >= self.MAX_TOP_RESTAURANTS:
-                    break
-
-            return result
-
-        except Exception:
-            return []
-
-    def _get_highly_rated_restaurants(self, user):
-        review_model = self._find_model("Review")
-
-        if review_model is None:
-            return []
-
-        user_field = self._find_user_field(review_model)
-
-        if user_field is None:
-            return []
-
-        rating_field = self._find_first_field(
-            review_model,
-            ["rating", "score", "stars"],
+        favorites = (
+            Favorite.objects
+            .filter(user=user)
+            .select_related("restaurant")
+            .order_by("-created_at")[:self.MAX_TOP_RESTAURANTS]
         )
 
-        restaurant_field = self._find_first_field(
-            review_model,
-            ["restaurant"],
-        )
-
-        if rating_field is None or restaurant_field is None:
-            return []
-
-        try:
-            reviews = (
-                review_model.objects
-                .filter(**{user_field: user})
-                .filter(**{f"{rating_field}__gte": 4})
-                .select_related(restaurant_field)
-                .order_by("-id")
-            )
-
-            result = []
-            seen_restaurants = set()
-
-            for review in reviews:
-                restaurant = getattr(
-                    review,
-                    restaurant_field,
-                    None,
-                )
-
-                if restaurant is None:
-                    continue
-
-                if restaurant.id in seen_restaurants:
-                    continue
-
-                seen_restaurants.add(restaurant.id)
-
-                result.append({
-                    "id": restaurant.id,
-                    "name": restaurant.name,
-                    "rating": float(
-                        getattr(review, rating_field)
-                    ),
-                })
-
-                if len(result) >= self.MAX_TOP_RESTAURANTS:
-                    break
-
-            return result
-
-        except Exception:
-            return []
-
-    @staticmethod
-    def _find_model(model_name):
-        for model in apps.get_models():
-            if model.__name__.lower() == model_name.lower():
-                return model
-
-        return None
-
-    @staticmethod
-    def _find_user_field(model):
-        possible_names = [
-            "user",
-            "client",
-            "customer",
-            "owner",
+        return [
+            {
+                "id": favorite.restaurant.id,
+                "name": favorite.restaurant.name,
+            }
+            for favorite in favorites
+            if favorite.restaurant is not None
         ]
 
-        field_names = {
-            field.name
-            for field in model._meta.get_fields()
-            if hasattr(field, "name")
-        }
+    def _get_highly_rated_restaurants(self, user):
+        reviews = (
+            Review.objects
+            .filter(
+                client=user,
+                rating__gte=4,
+            )
+            .select_related("restaurant")
+            .order_by("-id")[:self.MAX_TOP_RESTAURANTS]
+        )
 
-        for name in possible_names:
-            if name in field_names:
-                return name
+        result = []
+        seen_restaurants = set()
 
-        return None
+        for review in reviews:
+            restaurant = review.restaurant
 
-    @staticmethod
-    def _find_first_field(model, possible_names):
-        field_names = {
-            field.name
-            for field in model._meta.get_fields()
-            if hasattr(field, "name")
-        }
+            if restaurant is None:
+                continue
 
-        for name in possible_names:
-            if name in field_names:
-                return name
+            if restaurant.id in seen_restaurants:
+                continue
 
-        return None
+            seen_restaurants.add(restaurant.id)
+
+            result.append({
+                "id": restaurant.id,
+                "name": restaurant.name,
+                "rating": float(review.rating),
+            })
+
+            if len(result) >= self.MAX_TOP_RESTAURANTS:
+                break
+
+        return result

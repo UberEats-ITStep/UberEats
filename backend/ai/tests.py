@@ -5,12 +5,14 @@ from unittest import skipUnless
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
 from rest_framework import status
 from rest_framework.test import APITestCase
+from django.test.utils import CaptureQueriesContext
 
 from restaurants.models import (
     Restaurant,
@@ -1110,6 +1112,80 @@ class AIRecommendTests(APITestCase):
             )["top_cuisines"],
             [],
         )
+
+    def test_completed_order_history_is_capped(self):
+        for _ in range(UserContextBuilder.MAX_ORDERS + 1):
+            Order.objects.create(
+                client=self.user,
+                restaurant=self.restaurant,
+                status=Order.STATUS_COMPLETED,
+                total_price=Decimal("200.00"),
+                street="Soborna",
+                building="1",
+            )
+
+        context = UserContextBuilder().build(self.user)
+
+        self.assertEqual(
+            context["completed_order_count"],
+            UserContextBuilder.MAX_ORDERS,
+        )
+
+    def test_highly_rated_restaurant_query_is_capped(self):
+        order = Order.objects.create(
+            client=self.user,
+            restaurant=self.restaurant,
+            status=Order.STATUS_COMPLETED,
+            total_price=Decimal("150.00"),
+            street="Soborna",
+            building="1",
+        )
+        Review.objects.create(
+            client=self.user,
+            restaurant=self.restaurant,
+            order=order,
+            rating=5,
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            result = UserContextBuilder()._get_highly_rated_restaurants(
+                self.user
+            )
+
+        review_query = next(
+            query["sql"]
+            for query in queries
+            if "review" in query["sql"].lower()
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertIn("LIMIT 5", review_query.upper())
+
+    def test_context_fetches_restaurant_signals_once(self):
+        Order.objects.create(
+            client=self.user,
+            restaurant=self.restaurant,
+            status=Order.STATUS_COMPLETED,
+            total_price=Decimal("150.00"),
+            street="Soborna",
+            building="1",
+        )
+
+        builder = UserContextBuilder()
+
+        with patch.object(
+            builder,
+            "_get_favorite_restaurants",
+            wraps=builder._get_favorite_restaurants,
+        ) as favorite_method, patch.object(
+            builder,
+            "_get_highly_rated_restaurants",
+            wraps=builder._get_highly_rated_restaurants,
+        ) as rated_method:
+            builder.build(self.user)
+
+        self.assertEqual(favorite_method.call_count, 1)
+        self.assertEqual(rated_method.call_count, 1)
 
     def test_favorites_are_context_even_without_completed_orders(self):
         Favorite.objects.create(
