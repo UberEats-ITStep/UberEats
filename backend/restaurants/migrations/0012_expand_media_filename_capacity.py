@@ -1,0 +1,44 @@
+# Generated manually for Cloudinary media public IDs.
+
+import restaurants.models
+import restaurants.validators
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("restaurants", "0011_alter_menuitem_image_alter_restaurant_image"),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name="restaurant",
+            name="image",
+            field=models.ImageField(
+                blank=True,
+                max_length=255,
+                null=True,
+                upload_to=restaurants.models.restaurant_image_upload_path,
+                validators=[
+                    restaurants.validators.validate_image_extension,
+                    restaurants.validators.validate_image_size,
+                    restaurants.validators.validate_image_integrity,
+                ],
+            ),
+        ),
+        migrations.AlterField(
+            model_name="menuitem",
+            name="image",
+            field=models.ImageField(
+                blank=True,
+                max_length=255,
+                null=True,
+                upload_to=restaurants.models.menu_item_image_upload_path,
+                validators=[
+                    restaurants.validators.validate_image_extension,
+                    restaurants.validators.validate_image_size,
+                    restaurants.validators.validate_image_integrity,
+                ],
+            ),
+        ),
+    ]

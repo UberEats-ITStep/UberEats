@@ -62,9 +62,17 @@ const MenuItemCard: FC<MenuItemCardProps> = ({ item, onAddToCart, actionSlot, is
       </div>
 
       <div className="w-24 h-24 md:w-32 md:h-32 shrink-0 bg-secondary overflow-hidden">
-        {!showPlaceholder && (
+        {showPlaceholder ? (
+          <div
+            role="img"
+            aria-label={`${item.name} placeholder`}
+            className="flex h-full w-full items-center justify-center bg-primary px-2 text-center font-serif italic text-sm text-surface"
+          >
+            BiteUp.
+          </div>
+        ) : (
           <img
-            src={item.image!}
+            src={item.image || undefined}
             alt={item.name}
             onError={() => setImageError(true)}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"

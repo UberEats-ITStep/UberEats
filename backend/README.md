@@ -81,6 +81,26 @@ For a temporary local run without PostgreSQL, set `DJANGO_USE_SQLITE=true` in
 `.env`. This creates the ignored `backend/db.sqlite3` file and must not be used
 for Neon or production.
 
+### Cloudinary media storage
+
+Restaurant and menu-item uploads use Django's storage API. In debug mode,
+images use local filesystem storage unless all three Cloudinary variables are
+configured. Production requires Cloudinary and fails during startup when the
+configuration is incomplete:
+
+```dotenv
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+```
+
+Keep these values in the runtime environment or an ignored `.env` file. Never
+commit them or expose them through frontend variables. Uploaded files use
+stable paths under `biteup/restaurants/<catalog-key>/` and
+`biteup/menu-items/<catalog-key>/<item-slug>/`; API serializers return secure,
+optimized Cloudinary URLs while preserving the existing `image` and
+`image_url` response fields.
+
 ```bash
 python manage.py migrate
 python manage.py runserver

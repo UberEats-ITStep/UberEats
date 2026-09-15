@@ -74,6 +74,39 @@ if not DEBUG:
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+cloudinary_config = {
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME", ""),
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY", ""),
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET", ""),
+}
+CLOUDINARY_ENABLED = all(cloudinary_config.values())
+CLOUDINARY_STORAGE = cloudinary_config
+
+if not DEBUG and not CLOUDINARY_ENABLED:
+    raise ImproperlyConfigured(
+        "Cloudinary must be configured in production. Set "
+        "CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET."
+    )
+
+if CLOUDINARY_ENABLED:
+    STORAGES = {
+        "default": {
+            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+
 # Application definition
 
 INSTALLED_APPS = [

@@ -6,12 +6,21 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import TestCase
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
 
-from .models import Category, Cuisine, MenuItem, Restaurant
+from .models import (
+    Category,
+    Cuisine,
+    MenuItem,
+    Restaurant,
+    menu_item_image_upload_path,
+    restaurant_image_upload_path,
+)
+from .serializers import ImageURLMixin
 
 
 def _valid_png_bytes() -> bytes:
@@ -25,6 +34,59 @@ def _valid_png_bytes() -> bytes:
 def make_cuisine(name="Japanese"):
     return Cuisine.objects.get_or_create(name=name)[0]
 
+
+class CloudinaryMediaConfigurationTests(SimpleTestCase):
+    def test_upload_paths_are_stable_and_predictable(self):
+        cuisine = Cuisine(name="Cuisine")
+        restaurant = Restaurant(
+            name="Sample Bistro",
+            catalog_key="sample-bistro",
+            cuisine=cuisine,
+        )
+        category = Category(name="Mains")
+        item = MenuItem(
+            restaurant=restaurant,
+            category=category,
+            name="Margherita Pizza",
+            slug="margherita-pizza",
+        )
+
+        self.assertEqual(
+            restaurant_image_upload_path(restaurant, "cover.png"),
+            "biteup/restaurants/sample-bistro/cover.png",
+        )
+        self.assertEqual(
+            menu_item_image_upload_path(item, "dish.jpg"),
+            "biteup/menu-items/sample-bistro/margherita-pizza.jpg",
+        )
+        self.assertEqual(restaurant._meta.get_field("image").max_length, 255)
+        self.assertEqual(item._meta.get_field("image").max_length, 255)
+
+    @override_settings(
+        CLOUDINARY_ENABLED=True,
+        CLOUDINARY_STORAGE={"CLOUD_NAME": "example-cloud"},
+    )
+    def test_cloudinary_url_uses_https_and_optimized_transformations(self):
+        class CloudinaryStorage:
+            __module__ = "cloudinary_storage.storage"
+
+        class FileField:
+            name = "biteup/restaurants/sample-bistro/cover.png"
+            url = "/media/cover.png"
+            storage = CloudinaryStorage()
+
+        serializer = ImageURLMixin()
+        serializer.context = {}
+
+        url = serializer._resolve_image_url(
+            FileField(),
+            "",
+            "/fallback.png",
+            width=1000,
+        )
+
+        self.assertIn("https://res.cloudinary.com/example-cloud/image/upload/", url)
+        self.assertIn("c_limit,f_auto,q_auto,w_1000", url)
 
 class RestaurantImageValidationTests(TestCase):
     def setUp(self):
@@ -86,7 +148,7 @@ class RestaurantImageValidationTests(TestCase):
             image=SimpleUploadedFile("photo.png", _valid_png_bytes(), content_type="image/png"),
         )
         self.assertNotEqual(restaurant.resolved_image_url, "https://example.com/a.jpg")
-        self.assertIn("photo", restaurant.resolved_image_url)
+        self.assertIn("/biteup/restaurants/", restaurant.resolved_image_url)
 
 
 class MenuItemImageValidationTests(TestCase):
