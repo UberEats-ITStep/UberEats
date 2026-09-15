@@ -187,6 +187,14 @@ def _without_size_suffix(name: str) -> str:
     return name
 
 
+def _asset_authorization(asset: Asset | None) -> str:
+    if asset is None:
+        return "No source found"
+    if asset.license_name == "Existing project asset":
+        return "Previously uploaded BiteUp project media"
+    return "Public license recorded; not restaurant-provided"
+
+
 class Command(BaseCommand):
     help = "Upload licensed, title-matched Commons images without replacing existing media."
 
@@ -324,13 +332,7 @@ class Command(BaseCommand):
                     "status": status,
                     "image": image_name,
                     "asset": asset,
-                    "authorization": (
-                        "Public license recorded; not restaurant-provided"
-                        if asset and asset.license_name != "Existing project asset"
-                        else "Existing project asset reused for visual category fallback"
-                        if asset
-                        else "No source found"
-                    ),
+                    "authorization": _asset_authorization(asset),
                 }
             )
 

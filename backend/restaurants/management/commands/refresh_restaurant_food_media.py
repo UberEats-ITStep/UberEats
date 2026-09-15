@@ -66,6 +66,51 @@ def download(url: str) -> bytes:
     return data
 
 
+def restaurant_keywords(restaurant: Restaurant) -> tuple[str, ...]:
+    branded_keywords = {
+        "McDonald’s": ("big mac", "mcnugget", "cheeseburger", "chicken burger", "fries"),
+        "KFC": ("chicken nuggets", "spicy chicken wings"),
+    }
+    return branded_keywords.get(restaurant.name, KEYWORDS.get(restaurant.cuisine.name, ()))
+
+
+def choose_source(
+    restaurant: Restaurant, menu_items: list[MenuItem], used_sources: set[str]
+) -> tuple[MenuItem, str] | None:
+    keywords = restaurant_keywords(restaurant)
+    candidates = (
+        (item, item.image.url)
+        for item in menu_items
+        if item.restaurant_id == restaurant.id and item.image.url not in used_sources
+    )
+    return min(
+        candidates,
+        key=lambda candidate, keywords=keywords: (
+            -sum(word in candidate[0].name.lower() for word in keywords),
+            "signature" in candidate[0].name.lower(),
+            candidate[0].id,
+        ),
+        default=None,
+    )
+
+
+def plan_assignments(
+    restaurants: list[Restaurant], menu_items: list[MenuItem]
+) -> tuple[list[tuple[Restaurant, MenuItem, str]], list[tuple[Restaurant, str]]]:
+    assignments = []
+    unresolved = []
+    used_sources: set[str] = set()
+    for restaurant in restaurants:
+        chosen = choose_source(restaurant, menu_items, used_sources)
+        if chosen is None:
+            unresolved.append((restaurant, "no unique Cloudinary food source"))
+            continue
+        item, source = chosen
+        used_sources.add(source)
+        assignments.append((restaurant, item, source))
+    return assignments, unresolved
+
+
 class Command(BaseCommand):
     help = "Give every restaurant a distinct cuisine-matched Cloudinary cover."
 
@@ -95,46 +140,7 @@ class Command(BaseCommand):
         ]
         backup = write_backup(before, options["backup"])
 
-        used_sources: set[str] = set()
-        assignments = []
-        unresolved = []
-        for restaurant in restaurants:
-            cuisine = restaurant.cuisine.name
-            keywords = KEYWORDS.get(cuisine, ())
-            if restaurant.name == "McDonald’s":
-                keywords = (
-                    "big mac",
-                    "mcnugget",
-                    "cheeseburger",
-                    "chicken burger",
-                    "fries",
-                )
-            elif restaurant.name == "KFC":
-                keywords = (
-                    "chicken nuggets",
-                    "spicy chicken wings",
-                )
-            candidates = [
-                item for item in menu_items if item.restaurant_id == restaurant.id
-            ]
-            candidates.sort(
-                key=lambda item: (
-                    -sum(word in item.name.lower() for word in keywords),
-                    "signature" in item.name.lower(),
-                    item.id,
-                )
-            )
-            chosen = None
-            for item in candidates:
-                source = item.image.url
-                if source not in used_sources:
-                    chosen = (item, source)
-                    break
-            if chosen is None:
-                unresolved.append((restaurant, "no unique Cloudinary food source"))
-            else:
-                used_sources.add(chosen[1])
-                assignments.append((restaurant, *chosen))
+        assignments, unresolved = plan_assignments(restaurants, menu_items)
 
         for restaurant, reason in unresolved:
             self.stderr.write(f"UNRESOLVED {restaurant.id} {restaurant.name}: {reason}")

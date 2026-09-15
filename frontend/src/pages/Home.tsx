@@ -23,9 +23,11 @@ const EMPTY_FILTERS: RestaurantFilterValues = {
 
 const shuffleRestaurants = (restaurants: Restaurant[]): Restaurant[] => {
   const shuffled = [...restaurants];
+  const randomValues = new Uint32Array(shuffled.length);
+  crypto.getRandomValues(randomValues);
 
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
+    const randomIndex = Math.floor((randomValues[index] / 2 ** 32) * (index + 1));
     [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
   }
 
