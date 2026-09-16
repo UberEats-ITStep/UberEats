@@ -39,14 +39,17 @@ export const SmartSearchBar: FC = () => {
     setLocalQuery(value);
 
     if (!isAiMode) {
-      if (value) {
-        setSearchParams({ q: value });
-        if (location.pathname !== '/' && location.pathname !== '/restaurants') {
-           navigate(`/?q=${encodeURIComponent(value)}`);
-        }
+      const nextParams = new URLSearchParams(searchParams);
+      if (value.trim()) {
+        nextParams.set('q', value);
       } else {
-        searchParams.delete('q');
-        setSearchParams(searchParams);
+        nextParams.delete('q');
+      }
+
+      if (location.pathname !== '/' && location.pathname !== '/restaurants') {
+        navigate({ pathname: '/', search: nextParams.toString() }, { replace: true });
+      } else {
+        setSearchParams(nextParams, { replace: true });
       }
     }
   };

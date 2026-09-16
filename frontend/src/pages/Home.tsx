@@ -174,9 +174,9 @@ const Home: FC = () => {
                 
                 {/* Sidebar stacked */}
                 {sideRestaurants.length > 0 && (
-                  <div className="col-span-1 md:col-span-4 lg:col-span-4 flex flex-col gap-6 lg:gap-8 justify-between">
+                  <div className="col-span-1 md:col-span-4 lg:col-span-4 flex flex-col justify-start gap-6 lg:gap-8">
                     {sideRestaurants.map(restaurant => (
-                      <div className="flex-1 restaurant-featured-reveal" key={restaurant.id}>
+                      <div className="restaurant-featured-reveal" key={restaurant.id}>
                         <RestaurantCard restaurant={restaurant} isFeatured={false} compact={true} />
                       </div>
                     ))}

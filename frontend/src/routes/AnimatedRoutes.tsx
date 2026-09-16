@@ -29,6 +29,16 @@ const AnimatedRoutes: React.FC = () => {
       return;
     }
 
+    if (location.pathname === displayLocation.pathname) {
+      if (
+        location.search !== displayLocation.search ||
+        location.hash !== displayLocation.hash
+      ) {
+        setDisplayLocation(location);
+      }
+      return;
+    }
+
     if (location.pathname !== displayLocation.pathname) {
       gsap.to(transitionRef.current, {
         opacity: 0,

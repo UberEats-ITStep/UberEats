@@ -11,6 +11,17 @@ interface RefreshResponse {
 
 export const AUTH_LOGOUT_EVENT = 'auth:logout';
 
+const PUBLIC_API_PATHS = new Set([
+  '/restaurants/',
+  '/cuisines/',
+  '/categories/',
+]);
+
+const isPublicRequest = (url?: string) => {
+  const path = url?.split('?')[0];
+  return path ? PUBLIC_API_PATHS.has(path) : false;
+};
+
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api',
   headers: {
@@ -21,7 +32,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
-    if (token && config.headers) {
+    if (token && config.headers && !isPublicRequest(config.url)) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
