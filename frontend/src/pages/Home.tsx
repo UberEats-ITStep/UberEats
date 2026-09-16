@@ -71,7 +71,7 @@ const Home: FC = () => {
           minRating: activeFilters.minRating ? Number(activeFilters.minRating) : undefined,
           ordering: activeFilters.ordering,
         }, controller.signal);
-        setRestaurants(shuffleRestaurants(data));
+        setRestaurants(activeFilters.ordering ? data : shuffleRestaurants(data));
       } catch {
         if (!controller.signal.aborted) {
           setRequestError('We could not load restaurants right now. Please try again.');
@@ -90,7 +90,7 @@ const Home: FC = () => {
   useGSAP(() => {
     if (isLoading || restaurants.length === 0) return;
 
-    let mm = gsap.matchMedia();
+    const mm = gsap.matchMedia();
     mm.add("(prefers-reduced-motion: no-preference)", () => {
       // Stagger entrance for featured section
       gsap.fromTo('.restaurant-featured-reveal',
