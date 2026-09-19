@@ -8,6 +8,7 @@ from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
+from pgvector.django import VectorField
 from .validators import validate_image_extension, validate_image_integrity, validate_image_size
 
 
@@ -248,6 +249,9 @@ class MenuItem(models.Model):
     calories = models.PositiveIntegerField(null=True, blank=True)
     tags = models.ManyToManyField(MenuTag, related_name="menu_items", blank=True)
 
+    embedding = VectorField(dimensions=384, null=True, blank=True)
+    is_embedding_stale = models.BooleanField(default=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -296,7 +300,29 @@ class MenuItem(models.Model):
                 slug = f"{base_slug}-{suffix}"
                 suffix += 1
             self.slug = slug
+
+        if self.pk:
+            old_item = MenuItem.objects.get(pk=self.pk)
+            # Check if any semantic fields changed
+            semantic_fields_changed = (
+                old_item.name != self.name or
+                old_item.description != self.description or
+                old_item.category_id != self.category_id or
+                old_item.restaurant_id != self.restaurant_id
+            )
+            if semantic_fields_changed:
+                self.is_embedding_stale = True
+
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.name
+
+
+from django.db.models.signals import m2m_changed
+from django.dispatch import receiver
+
+@receiver(m2m_changed, sender=MenuItem.tags.through)
+def update_embedding_stale_on_tags_change(sender, instance, action, **kwargs):
+    if action in ["post_add", "post_remove", "post_clear"]:
+        MenuItem.objects.filter(pk=instance.pk).update(is_embedding_stale=True)

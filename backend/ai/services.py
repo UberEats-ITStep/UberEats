@@ -46,8 +46,72 @@ class GroqClient:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
             ],
-            "temperature": temperature,
-            "response_format": {"type": "json_object"}
+            "temperature": temperature
+        }
+
+        import time
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(self.base_url, headers=headers, json=payload, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                raw_text = data["choices"][0]["message"]["content"]
+                raw_text = raw_text.strip()
+                if raw_text.startswith("```json"):
+                    raw_text = raw_text[7:]
+                if raw_text.startswith("```"):
+                    raw_text = raw_text[3:]
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-3]
+                raw_text = raw_text.strip()
+                if raw_text.startswith("{") and not raw_text.endswith("}"):
+                    logger.warning("Applying dirty fix for missing closing bracket.")
+                    raw_text += "}"
+                return json.loads(raw_text)
+            except requests.exceptions.RequestException as e:
+                error_body = e.response.text if e.response is not None else "No response body"
+                logger.error(f"Groq network error: {str(e)} | Body: {error_body}")
+                
+                if e.response is not None and e.response.status_code == 429 and attempt < max_retries - 1:
+                    # Groq tracks rate limits per model. Switching to a fallback model often bypasses the limit.
+                    # We will check if the user has GROQ_FALLBACK_MODEL in settings, or use a default fast model.
+                    fallback_model = getattr(settings, "GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+                    
+                    # If the current model is already the fallback model, we can't fall back further.
+                    if payload["model"] != fallback_model:
+                        logger.warning(f"Rate limit hit for {payload['model']}. Falling back to {fallback_model}...")
+                        payload["model"] = fallback_model
+                        time.sleep(1) # Tiny buffer
+                        continue
+                        
+                if "json_validate_failed" in error_body and attempt < max_retries - 1:
+                    logger.warning("Groq JSON validation failed. Retrying...")
+                    time.sleep(1)
+                    continue
+                raise GroqAPIException()
+            except json.JSONDecodeError as e:
+                logger.error(f"Groq returned invalid JSON: {str(e)}")
+                if attempt < max_retries - 1:
+                    logger.warning("Retrying due to JSON decode error...")
+                    time.sleep(1)
+                    continue
+                raise GroqAPIException()
+            except Exception as e:
+                logger.error(f"Unexpected Groq error: {str(e)}")
+                raise GroqAPIException()
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            "temperature": temperature
         }
 
         try:
@@ -55,6 +119,14 @@ class GroqClient:
             response.raise_for_status()
             data = response.json()
             raw_text = data["choices"][0]["message"]["content"]
+            raw_text = raw_text.strip()
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:]
+            if raw_text.startswith("```"):
+                raw_text = raw_text[3:]
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
+            raw_text = raw_text.strip()
             return json.loads(raw_text)
         except requests.exceptions.RequestException as e:
             error_body = e.response.text if e.response is not None else "No response body"
@@ -141,7 +213,8 @@ class IntentExtractor:
 
 
 class CandidateRetriever:
-    def retrieve(self, intent: dict) -> list:
+    def retrieve(self, intent: dict, user_context: dict = None) -> list:
+        user_context = user_context or {}
         queryset = MenuItem.objects.filter(is_available=True).select_related('restaurant', 'category').prefetch_related('tags')
 
         max_price = intent.get("max_price")
@@ -162,15 +235,47 @@ class CandidateRetriever:
         if cuisines:
             queryset = queryset.filter(restaurant__cuisine__name__in=cuisines)
 
+        semantic_query = intent.get("semantic_query")
         keywords = intent.get("keywords", [])
-        if keywords:
+        
+        semantic_success = False
+        
+        if semantic_query:
+            try:
+                from fastembed import TextEmbedding
+                from pgvector.django import CosineDistance
+                
+                # We could cache the model initialization, but fastembed handles this gracefully 
+                # after the first download.
+                embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+                query_embedding = list(embedding_model.embed([semantic_query]))[0]
+                
+                # Order by vector similarity. The hard filters above are preserved.
+                # Exclude items that have no embedding generated yet just in case.
+                queryset = queryset.exclude(embedding__isnull=True).order_by(
+                    CosineDistance("embedding", list(query_embedding))
+                )
+                semantic_success = True
+            except Exception as e:
+                logger.error("Semantic retrieval failed: %s", e)
+                # Fallback to lexical below
+
+        if not semantic_success and keywords:
+            # Fallback to lexical retrieval
             keyword_q = Q()
             for kw in keywords:
                 keyword_q |= Q(name__icontains=kw) | Q(description__icontains=kw) | Q(tags__name__icontains=kw)
             queryset = queryset.filter(keyword_q).distinct()
 
-        # Limit to reasonable number to fit in context window
-        candidates = queryset.order_by("-restaurant__rating", "-id")[:50]
+        if not semantic_success:
+            # If we didn't use semantic ordering, fall back to default rating ordering
+            queryset = queryset.order_by("-restaurant__rating", "-id")
+
+        # Limit to reasonable number to fit in context window and avoid Groq TPM limits
+        candidates = queryset[:20]
+        
+
+        consumed_ids = set(user_context.get("consumed_item_ids", []))
         
         results = []
         for item in candidates:
@@ -183,7 +288,8 @@ class CandidateRetriever:
                 "tags": [tag.name for tag in item.tags.all()],
                 "is_vegetarian": item.is_vegetarian,
                 "is_vegan": item.is_vegan,
-                "calories": item.calories
+                "calories": item.calories,
+                "consumed_before": item.id in consumed_ids,
             })
         return results
 
@@ -257,8 +363,11 @@ class RecommendationOrchestrator:
             user_context["completed_order_count"],
         )
 
-        candidates = self.retriever.retrieve(intent)
+        candidates = self.retriever.retrieve(intent, user_context=user_context)
         logger.info(f"Candidate count retrieved: {len(candidates)}")
+        
+        # Remove consumed_item_ids from context before sending to LLM to save tokens
+        user_context.pop("consumed_item_ids", None)
 
         if not candidates:
             return {

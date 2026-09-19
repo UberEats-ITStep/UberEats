@@ -11,6 +11,7 @@ class ExtractedIntentSerializer(serializers.Serializer):
     max_price = serializers.IntegerField(allow_null=True, required=False)
     is_vegetarian = serializers.BooleanField(allow_null=True, required=False)
     is_vegan = serializers.BooleanField(allow_null=True, required=False)
+    semantic_query = serializers.CharField(max_length=200, allow_blank=True, required=False, allow_null=True)
     keywords = serializers.ListField(
         child=serializers.CharField(max_length=50), required=False, default=list
     )
