@@ -25,12 +25,14 @@ Map the user's intent to the following JSON schema exactly:
   "max_price": integer | null,
   "is_vegetarian": boolean | null,
   "is_vegan": boolean | null,
+  "semantic_query": string | null,
   "keywords": [string],
   "categories": [string],
   "cuisines": [string]
 }
 
 Guidelines:
+- "semantic_query": A clean, food-focused semantic description of what the user wants, excluding hard constraints. For example, "Something light but filling under 300 UAH" -> "light but filling satisfying food". Leave null if there is no distinct semantic intent.
 
 1. ONLY return valid JSON.
 2. If a constraint is not explicitly mentioned, leave it as null or empty list.

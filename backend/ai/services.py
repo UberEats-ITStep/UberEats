@@ -162,15 +162,44 @@ class CandidateRetriever:
         if cuisines:
             queryset = queryset.filter(restaurant__cuisine__name__in=cuisines)
 
+        semantic_query = intent.get("semantic_query")
         keywords = intent.get("keywords", [])
-        if keywords:
+        
+        semantic_success = False
+        
+        if semantic_query:
+            try:
+                from fastembed import TextEmbedding
+                from pgvector.django import CosineDistance
+                
+                # We could cache the model initialization, but fastembed handles this gracefully 
+                # after the first download.
+                embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+                query_embedding = list(embedding_model.embed([semantic_query]))[0]
+                
+                # Order by vector similarity. The hard filters above are preserved.
+                # Exclude items that have no embedding generated yet just in case.
+                queryset = queryset.exclude(embedding__isnull=True).order_by(
+                    CosineDistance("embedding", list(query_embedding))
+                )
+                semantic_success = True
+            except Exception as e:
+                logger.error("Semantic retrieval failed: %s", e)
+                # Fallback to lexical below
+
+        if not semantic_success and keywords:
+            # Fallback to lexical retrieval
             keyword_q = Q()
             for kw in keywords:
                 keyword_q |= Q(name__icontains=kw) | Q(description__icontains=kw) | Q(tags__name__icontains=kw)
             queryset = queryset.filter(keyword_q).distinct()
 
-        # Limit to reasonable number to fit in context window
-        candidates = queryset.order_by("-restaurant__rating", "-id")[:50]
+        if not semantic_success:
+            # If we didn't use semantic ordering, fall back to default rating ordering
+            queryset = queryset.order_by("-restaurant__rating", "-id")
+
+        # Limit to reasonable number to fit in context window and avoid Groq TPM limits
+        candidates = queryset[:20]
         
         results = []
         for item in candidates:
