@@ -17,6 +17,7 @@ from .serializers import (
     RegisterSerializer,
     ResetPasswordSerializer,
     ChangePasswordSerializer,
+    UserEventSerializer,
 )
 from .services.password_reset import PasswordResetService
 from .services.firebase_auth import (
@@ -280,3 +281,10 @@ class ResendVerificationView(APIView):
             return Response({'message': 'Verification email sent.'}, status=status.HTTP_200_OK)
         except ValueError as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UserEventCreateView(generics.CreateAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = UserEventSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

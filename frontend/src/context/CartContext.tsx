@@ -4,6 +4,7 @@ import { cartService } from '../features/cart/api/cart.service';
 import type { Cart } from '../features/cart/types/cart.types';
 import { useAuth } from '../hooks/useAuth';
 import { Modal, Button } from '../components/common';
+import { trackEvent } from '../utils/analytics';
 
 interface CartContextType {
   cart: Cart | null;
@@ -81,6 +82,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addToCart = async (menuItemId: number, quantity: number, restaurantId: number) => {
+    trackEvent('ADD_TO_CART', { menu_item_id: menuItemId, restaurant_id: restaurantId });
     if (!isAuthenticated) {
       setError('Please log in to add items to your cart.');
       return;

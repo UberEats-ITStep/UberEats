@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useMemo, useState, useEffect, type FC } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useRestaurantDetails } from '../features/restaurants/hooks/useRestaurantDetails';
 import RestaurantHero from '../features/restaurants/components/RestaurantHero';
@@ -9,6 +9,7 @@ import MenuFilters from '../features/restaurants/components/MenuFilters';
 import { LoadingState, Alert, Button, SectionContainer } from '../components/common';
 import { useCart } from '../context/CartContext';
 import type { MenuItem } from '../features/restaurants/types/restaurant.types';
+import { trackEvent } from '../utils/analytics';
 import ReviewList from '../features/reviews/components/ReviewList';
 import { filterMenuCategories } from '../features/restaurants/utils/menuFiltering';
 
@@ -19,6 +20,12 @@ const RestaurantDetails: FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | 'all'>('all');
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+
+  useEffect(() => {
+    if (restaurant) {
+      trackEvent('RESTAURANT_VIEW', { restaurant_id: restaurant.id });
+    }
+  }, [restaurant?.id]);
 
   const filteredCategories = useMemo(() => {
     if (!restaurant) {
