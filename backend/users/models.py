@@ -55,6 +55,7 @@ class Profile(models.Model):
         AVATAR_04 = 'avatar_04', 'Avatar 04'
         AVATAR_05 = 'avatar_05', 'Avatar 05'
         AVATAR_06 = 'avatar_06', 'Avatar 06'
+        AVATAR_07 = 'avatar_07', 'Avatar 07'
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     phone_number = models.CharField(max_length=20, blank=True, null=True)

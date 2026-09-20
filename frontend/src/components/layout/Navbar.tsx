@@ -60,6 +60,9 @@ export const Navbar: FC = () => {
               </Link>
               {isAuthenticated && (
                 <>
+                  <Link to="/favorites" className={navLinkClass('/favorites')}>
+                    Favorites
+                  </Link>
                   <Link to="/orders" className={navLinkClass('/orders')}>
                     Orders
                   </Link>
@@ -177,6 +180,9 @@ export const Navbar: FC = () => {
             </Link>
             {isAuthenticated ? (
               <>
+                <Link to="/favorites" onClick={closeMenu} className={mobileNavLinkClass('/favorites')}>
+                  Favorites
+                </Link>
                 <Link to="/orders" onClick={closeMenu} className={mobileNavLinkClass('/orders')}>
                   Orders
                 </Link>

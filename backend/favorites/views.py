@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, status, viewsets
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -17,6 +18,8 @@ class FavoriteViewSet(
 ):
     serializer_class = FavoriteSerializer
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "favorites"
 
     def get_queryset(self):
         return (
@@ -44,15 +47,22 @@ class FavoriteViewSet(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        restaurant = get_object_or_404(
-            Restaurant.objects.filter(is_active=True),
-            pk=restaurant_id,
-        )
-        favorite = self.get_queryset().filter(restaurant=restaurant).first()
+        # Verify the restaurant exists and is active (to match existing 404 behavior)
+        restaurant_exists = Restaurant.objects.filter(pk=restaurant_id, is_active=True).exists()
+        if not restaurant_exists:
+            from django.http import Http404
+            raise Http404()
+
+        # Optimize the favorite check to avoid unnecessary joins from get_queryset()
+        favorite = Favorite.objects.filter(
+            user=self.request.user,
+            restaurant_id=restaurant_id
+        ).values("id").first()
+
         return Response(
             {
-                "restaurant": restaurant.pk,
+                "restaurant": restaurant_id,
                 "is_favorite": favorite is not None,
-                "favorite_id": favorite.id if favorite else None,
+                "favorite_id": favorite["id"] if favorite else None,
             }
         )

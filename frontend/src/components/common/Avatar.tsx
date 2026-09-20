@@ -1,9 +1,9 @@
 import type { FC, ReactElement } from 'react';
 
-type AvatarId = 'avatar_01' | 'avatar_02' | 'avatar_03' | 'avatar_04' | 'avatar_05' | 'avatar_06';
+type AvatarId = 'avatar_01' | 'avatar_02' | 'avatar_03' | 'avatar_04' | 'avatar_05' | 'avatar_06' | 'avatar_07';
 
 const DEFAULT_AVATAR: AvatarId = 'avatar_01';
-const VALID_IDS: AvatarId[] = ['avatar_01', 'avatar_02', 'avatar_03', 'avatar_04', 'avatar_05', 'avatar_06'];
+const VALID_IDS: AvatarId[] = ['avatar_01', 'avatar_02', 'avatar_03', 'avatar_04', 'avatar_05', 'avatar_06', 'avatar_07'];
 
 const GLYPHS: Record<AvatarId, ReactElement> = {
   avatar_01: <line x1="16" y1="32" x2="48" y2="32" className="stroke-text-primary" strokeWidth="2" />,
@@ -32,6 +32,15 @@ const GLYPHS: Record<AvatarId, ReactElement> = {
     />
   ),
   avatar_06: <path d="M18 46a28 28 0 0 1 28-28" className="stroke-text-primary" strokeWidth="2" fill="none" />,
+  avatar_07: (
+    <polygon
+      points="32,16 46,38 18,38"
+      className="stroke-text-primary"
+      strokeWidth="2"
+      fill="none"
+      strokeLinejoin="round"
+    />
+  ),
 };
 
 export interface AvatarProps {
