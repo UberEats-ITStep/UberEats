@@ -1,5 +1,8 @@
 from rest_framework import serializers
+
 from orders.models import Order
+from users.permissions import is_admin
+
 from .models import Review
 
 
@@ -7,6 +10,8 @@ class ReviewSerializer(serializers.ModelSerializer):
     client_email = serializers.CharField(source='client.email', read_only=True)
     client_username = serializers.CharField(source='client.username', read_only=True)
     client_avatar = serializers.CharField(source='client.profile.avatar', read_only=True)
+
+    IMMUTABLE_ON_UPDATE = ('order', 'restaurant')
 
     class Meta:
         model = Review
@@ -18,6 +23,9 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance:
+            for field in self.IMMUTABLE_ON_UPDATE:
+                if field in attrs and attrs[field] != getattr(self.instance, field):
+                    raise serializers.ValidationError({field: "This field cannot be changed."})
             return attrs
 
         order = attrs.get('order')
@@ -41,3 +49,16 @@ class ReviewSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['client'] = self.context['request'].user
         return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        viewer = getattr(request, 'user', None)
+        may_see_email = (
+            viewer is not None
+            and viewer.is_authenticated
+            and (instance.client_id == viewer.pk or is_admin(viewer))
+        )
+        if not may_see_email:
+            data.pop('client_email', None)
+        return data

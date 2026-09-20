@@ -1,7 +1,7 @@
 export interface Review {
   id: number;
   client: number;
-  client_email: string;
+  client_email?: string;
   client_username: string;
   client_avatar: string;
   restaurant: number;
