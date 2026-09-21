@@ -35,7 +35,7 @@ const EditorialHero: FC = () => {
       >
         <div
           data-hero="photo"
-          className="editorial-hero__photo absolute inset-0 overflow-hidden"
+          className="editorial-hero__photo absolute top-0 left-0 w-full h-full overflow-hidden"
         >
           <img
             data-hero="image"

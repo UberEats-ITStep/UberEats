@@ -26,8 +26,14 @@
 @media (max-width: 767px) {
   .editorial-hero { height: 190svh; }
 
-  /* Symmetric frame: the image never translates horizontally during reveal. */
-  .editorial-hero__photo { clip-path: inset(14% 7% 27% 7%); }
+  /* Responsive bounding box instead of clip-path for mobile */
+  .editorial-hero__photo { 
+    top: 14%;
+    left: 7%;
+    width: 86%;
+    height: 59%;
+    clip-path: none;
+  }
 
   .editorial-hero__opening {
     left: 7%;
