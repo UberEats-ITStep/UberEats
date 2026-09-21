@@ -6,7 +6,6 @@ import { useGSAP } from '@gsap/react';
 gsap.registerPlugin(ScrollTrigger);
 
 const DESKTOP_INITIAL_CLIP = 'inset(16% 7% 14% 36%)';
-const MOBILE_INITIAL_CLIP = 'inset(14% 7% 27% 7%)';
 
 export const useHeroAnimation = () => {
   const containerRef = useRef<HTMLElement>(null);
@@ -128,9 +127,49 @@ export const useHeroAnimation = () => {
       });
 
       mm.add('(max-width: 767px) and (prefers-reduced-motion: no-preference)', () => {
-        prepareScene(MOBILE_INITIAL_CLIP, 1.08);
+        // We do not use clipPath for mobile anymore. The CSS sets top/left/width/height.
+        // We set the image to scale: 1 immediately so it just uses object-cover natively.
+        gsap.set(photo, { clipPath: 'none' });
+        gsap.set(image, { scale: 1, transformOrigin: '50% 50%' });
+        gsap.set(shade, { autoAlpha: 0 });
+        gsap.set(opening, { autoAlpha: 1 });
+        gsap.set(openingDetail, { autoAlpha: 1 });
+        gsap.set(eyebrow, { autoAlpha: 1 });
+        gsap.set(finalCopy, { autoAlpha: 0, y: 28 });
+        gsap.set(cta, { autoAlpha: 0, y: 12 });
+        gsap.set(nav, { color: '#191918' });
         
-        const introTl = playIntroAnimation(1.08);
+        // Custom mobile intro without image scaling
+        gsap.set(openingChars, { autoAlpha: 0, filter: 'blur(8px)' });
+        gsap.set(detailChars, { autoAlpha: 0, filter: 'blur(8px)' });
+        gsap.set(image, { autoAlpha: 0, filter: 'blur(14px)' });
+
+        const introTl = gsap.timeline();
+        introTl.to(
+          image,
+          {
+            autoAlpha: 1,
+            filter: 'blur(0px)',
+            duration: 1.3,
+            ease: 'power2.out',
+            clearProps: 'filter',
+          },
+          0,
+        );
+        introTl.to(openingChars, {
+          autoAlpha: 1,
+          filter: 'blur(0px)',
+          stagger: 0.04,
+          duration: 0.8,
+          ease: 'power2.out',
+        }, 0)
+        .to(detailChars, {
+          autoAlpha: 1,
+          filter: 'blur(0px)',
+          stagger: 0.02,
+          duration: 0.6,
+          ease: 'power2.out',
+        }, '>');
 
         const tl = gsap.timeline({
           defaults: { ease: 'none' },
@@ -148,8 +187,8 @@ export const useHeroAnimation = () => {
           },
         });
 
-        tl.to(photo, { clipPath: 'inset(0% 0% 0% 0%)', duration: 1.4, ease: 'power2.inOut' }, 0)
-          .to(image, { scale: 1, duration: 1.7 }, 0)
+        // Expand the container physically
+        tl.to(photo, { top: '0%', left: '0%', width: '100%', height: '100%', duration: 1.4, ease: 'power2.inOut' }, 0)
           .to(opening, { autoAlpha: 0, y: -10, duration: 0.5 }, 0.12)
           .to(eyebrow, { autoAlpha: 0, y: -8, duration: 0.4 }, 0.15)
           .to(shade, { autoAlpha: 0.5, duration: 0.7, ease: 'power1.inOut' }, 0.95)
