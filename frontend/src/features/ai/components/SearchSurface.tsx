@@ -144,6 +144,7 @@ export const SearchSurface: FC<SearchSurfaceProps> = ({
                     index={idx}
                     isFeatured={idx === 0 && data.recommendations.length > 1}
                     onClose={onClose}
+                    requestId={data.recommendation_request_id}
                   />
                 ))}
               </div>

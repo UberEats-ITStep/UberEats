@@ -19,7 +19,7 @@ export interface DeliveryAddress {
 }
 
 export type DeliveryAddressInput = Omit<DeliveryAddress, 'id' | 'is_default' | 'created_at' | 'updated_at'>;
-export type ProfileUpdate = Pick<Profile, 'phone_number' | 'avatar'>;
+export type ProfileUpdate = Pick<Profile, 'avatar'> & Partial<Pick<Profile, 'phone_number'>>;
 
 export interface AuthTokens {
   access: string;

@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
 import { formatPrice } from '../../../utils/currency';
+import { aiService } from '../api/ai.service';
 import type { AIRecommendationItem as AIRecommendationItemType } from '../types/ai.types';
 
 interface AIRecommendationItemProps {
@@ -8,6 +9,7 @@ interface AIRecommendationItemProps {
   index: number;
   isFeatured?: boolean;
   onClose: () => void;
+  requestId: string;
 }
 
 export const AIRecommendationItem: FC<AIRecommendationItemProps> = ({
@@ -15,18 +17,27 @@ export const AIRecommendationItem: FC<AIRecommendationItemProps> = ({
   index,
   isFeatured = false,
   onClose,
+  requestId,
 }) => {
   const numberStr = String(index + 1).padStart(2, '0');
 
   return (
     <Link
-      to={`/restaurants/${item.menu_item.restaurant.id}#item-${item.menu_item.id}`}
+      to={`/restaurants/${item.menu_item.restaurant.id}?ai_request=${requestId}&ai_item=${item.menu_item.id}&ai_position=${index + 1}#item-${item.menu_item.id}`}
       className={`group/item block focus:outline-none focus:bg-surface-muted transition-colors ${
         isFeatured 
           ? 'pb-6 mb-6 border-b border-border-default' 
           : 'py-4 border-t border-border-default first:border-t-0'
       }`}
-      onClick={onClose}
+      onClick={() => {
+        void aiService.trackRecommendationEvent(
+          requestId,
+          item.menu_item.id,
+          'clicked',
+          index + 1,
+        );
+        onClose();
+      }}
     >
       <div className={`flex items-start gap-4 ${isFeatured ? 'flex-col md:flex-row md:items-start' : 'flex-row'}`}>
         {/* Number */}

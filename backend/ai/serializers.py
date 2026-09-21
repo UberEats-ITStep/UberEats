@@ -30,3 +30,12 @@ class LLMRecommendedItemSerializer(serializers.Serializer):
 class LLMRecommendationResponseSerializer(serializers.Serializer):
     recommendations = LLMRecommendedItemSerializer(many=True, required=True)
     summary = serializers.CharField(max_length=500, required=True)
+
+
+class RecommendationEventSerializer(serializers.Serializer):
+    request_id = serializers.UUIDField()
+    menu_item_id = serializers.IntegerField(min_value=1)
+    event_type = serializers.ChoiceField(
+        choices=("clicked", "added_to_cart", "ordered")
+    )
+    position = serializers.IntegerField(min_value=1, max_value=4, required=False)

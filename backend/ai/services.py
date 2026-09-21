@@ -1,5 +1,6 @@
 import json
 import logging
+from dataclasses import dataclass, field
 from typing import Optional
 
 import requests
@@ -17,6 +18,32 @@ from .tools.errors import ToolError
 from .user_context import UserContextBuilder
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RecommendationTrace:
+    """Execution details used by evaluation and diagnostics, never API output."""
+
+    query: str
+    intent: dict = field(default_factory=dict)
+    user_context: dict = field(default_factory=dict)
+    candidates: list = field(default_factory=list)
+    raw_recommendations: list = field(default_factory=list)
+    discarded_recommendations: list = field(default_factory=list)
+    final_menu_item_ids: list = field(default_factory=list)
+    outcome: str = "pending"
+
+    def as_dict(self) -> dict:
+        return {
+            "query": self.query,
+            "intent": self.intent,
+            "user_context": self.user_context,
+            "candidates": self.candidates,
+            "raw_recommendations": self.raw_recommendations,
+            "discarded_recommendations": self.discarded_recommendations,
+            "final_menu_item_ids": self.final_menu_item_ids,
+            "outcome": self.outcome,
+        }
 
 
 class GroqAPIException(APIException):
@@ -142,7 +169,14 @@ class IntentExtractor:
 
 class CandidateRetriever:
     def retrieve(self, intent: dict) -> list:
-        queryset = MenuItem.objects.filter(is_available=True).select_related('restaurant', 'category').prefetch_related('tags')
+        queryset = (
+            MenuItem.objects.filter(
+                is_available=True,
+                restaurant__is_active=True,
+            )
+            .select_related('restaurant', 'category')
+            .prefetch_related('tags')
+        )
 
         max_price = intent.get("max_price")
         if max_price:
@@ -243,14 +277,21 @@ class RecommendationOrchestrator:
         self.vocabulary_provider = VocabularyProvider()
 
     def process(self, query: str, user) -> dict:
+        result, _ = self.process_with_trace(query=query, user=user)
+        return result
+
+    def process_with_trace(self, query: str, user) -> tuple[dict, dict]:
+        trace = RecommendationTrace(query=query)
         logger.info(f"AI Recommend started for query: '{query}'")
 
         vocabulary = self.vocabulary_provider.get()
 
         intent = self.extractor.extract(query, vocabulary=vocabulary)
+        trace.intent = intent
         logger.info(f"Extracted Intent: {intent}")
 
         user_context = self.user_context_builder.build(user)
+        trace.user_context = user_context
         logger.info(
             "Built user context (has_history=%s, completed_orders=%s)",
             user_context["has_history"],
@@ -258,13 +299,15 @@ class RecommendationOrchestrator:
         )
 
         candidates = self.retriever.retrieve(intent)
+        trace.candidates = candidates
         logger.info(f"Candidate count retrieved: {len(candidates)}")
 
         if not candidates:
+            trace.outcome = "no_candidates"
             return {
                 "message": "I couldn't find an option that matches all of those requirements.",
                 "recommendations": []
-            }
+            }, trace.as_dict()
 
         ranking_result = self.ranker.rank(
             query,
@@ -276,6 +319,7 @@ class RecommendationOrchestrator:
             "recommendations",
             []
         )
+        trace.raw_recommendations = raw_recommendations
 
         summary = ranking_result.get("summary", "")
 
@@ -283,11 +327,30 @@ class RecommendationOrchestrator:
             candidate["id"]
             for candidate in candidates
         }
-        valid_ids = [
-            rec["menu_item_id"]
-            for rec in raw_recommendations
-            if rec["menu_item_id"] in candidate_ids
-        ]
+        valid_ids = []
+        seen_ids = set()
+        for rec in raw_recommendations:
+            item_id = rec["menu_item_id"]
+            if item_id not in candidate_ids:
+                trace.discarded_recommendations.append({
+                    "menu_item_id": item_id,
+                    "reason": "not_in_candidate_pool",
+                })
+                continue
+            if item_id in seen_ids:
+                trace.discarded_recommendations.append({
+                    "menu_item_id": item_id,
+                    "reason": "duplicate_menu_item",
+                })
+                continue
+            if len(valid_ids) == 4:
+                trace.discarded_recommendations.append({
+                    "menu_item_id": item_id,
+                    "reason": "result_limit_exceeded",
+                })
+                continue
+            seen_ids.add(item_id)
+            valid_ids.append(item_id)
 
         db_items = (
             MenuItem.objects
@@ -308,7 +371,7 @@ class RecommendationOrchestrator:
         for rec in raw_recommendations:
             item_id = rec["menu_item_id"]
 
-            if item_id in item_map:
+            if item_id in item_map and item_id in valid_ids:
                 item = item_map[item_id]
 
                 final_recommendations.append({
@@ -324,16 +387,23 @@ class RecommendationOrchestrator:
                     "reason": rec["reason"],
                 })
 
+        trace.final_menu_item_ids = [
+            recommendation["menu_item"]["id"]
+            for recommendation in final_recommendations
+        ]
+
         if not final_recommendations:
+            trace.outcome = "no_valid_recommendations"
             return {
                 "message": (
                     "I couldn't find an option that perfectly "
                     "matches what you're looking for right now."
                 ),
                 "recommendations": [],
-            }
+            }, trace.as_dict()
 
+        trace.outcome = "recommended"
         return {
             "message": summary,
             "recommendations": final_recommendations,
-        }
+        }, trace.as_dict()

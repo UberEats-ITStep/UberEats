@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import type { FC } from 'react';
 import type { Order } from '../types/order.types';
 import Map, { Source, Layer, Marker, NavigationControl } from 'react-map-gl/maplibre';
@@ -12,6 +12,7 @@ interface OrderLiveMapProps {
 
 const OrderLiveMap: FC<OrderLiveMapProps> = ({ order }) => {
   const maptilerKey = import.meta.env.VITE_MAPTILER_API_KEY;
+  const [mapTilerEnabled, setMapTilerEnabled] = useState(Boolean(maptilerKey));
   const mapRef = useRef<MapRef>(null);
 
   const {
@@ -63,7 +64,7 @@ const OrderLiveMap: FC<OrderLiveMapProps> = ({ order }) => {
     return null; // Silent fallback if no coordinates
   }
 
-  const mapStyle = maptilerKey 
+  const mapStyle = mapTilerEnabled
     ? `https://api.maptiler.com/maps/basic-v2/style.json?key=${maptilerKey}`
     : {
         version: 8,
@@ -152,6 +153,7 @@ const OrderLiveMap: FC<OrderLiveMapProps> = ({ order }) => {
           latitude: startPoint[1],
           zoom: 13
         }}
+        onError={() => setMapTilerEnabled(false)}
         mapStyle={mapStyle}
         attributionControl={false}
       >

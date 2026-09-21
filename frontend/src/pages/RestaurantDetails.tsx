@@ -1,5 +1,6 @@
 import { useMemo, useState, type FC } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { aiService } from '../features/ai/api/ai.service';
 import { useRestaurantDetails } from '../features/restaurants/hooks/useRestaurantDetails';
 import RestaurantHero from '../features/restaurants/components/RestaurantHero';
 import RestaurantStats from '../features/restaurants/components/RestaurantStats';
@@ -14,6 +15,7 @@ import { filterMenuCategories } from '../features/restaurants/utils/menuFilterin
 
 const RestaurantDetails: FC = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
+  const location = useLocation();
   const { restaurant, isLoading, error, reload } = useRestaurantDetails(restaurantId);
   const { addToCart, isLoading: isCartLoading } = useCart();
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,9 +34,22 @@ const RestaurantDetails: FC = () => {
     });
   }, [restaurant, searchTerm, selectedCategory, showAvailableOnly]);
 
-  const handleAddToCart = (item: MenuItem) => {
+  const handleAddToCart = async (item: MenuItem) => {
     if (restaurant) {
-      void addToCart(item.id, 1, restaurant.id);
+      await addToCart(item.id, 1, restaurant.id);
+      const recommendation = new URLSearchParams(location.search);
+      if (recommendation.get('ai_item') === String(item.id)) {
+        const requestId = recommendation.get('ai_request');
+        const position = Number(recommendation.get('ai_position'));
+        if (requestId && Number.isInteger(position) && position > 0) {
+          void aiService.trackRecommendationEvent(
+            requestId,
+            item.id,
+            'added_to_cart',
+            position,
+          );
+        }
+      }
     }
   };
 

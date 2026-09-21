@@ -29,6 +29,7 @@ from ai.services import (
     VocabularyProvider,
 )
 
+from ai.models import RecommendationEvent
 from ai.user_context import UserContextBuilder
 
 from ai.tools import registry
@@ -237,6 +238,16 @@ class AIRecommendTests(APITestCase):
             data["recommendations"][0]["menu_item"]["id"],
             self.item2.id,
         )
+
+        self.assertIn("recommendation_request_id", data)
+        served_event = RecommendationEvent.objects.get(
+            request_id=data["recommendation_request_id"],
+        )
+        self.assertEqual(
+            served_event.event_type,
+            RecommendationEvent.EventType.SERVED,
+        )
+        self.assertEqual(served_event.menu_item_id, self.item2.id)
 
         self.assertEqual(
             mock_groq.call_count,
@@ -1311,6 +1322,61 @@ class AIRecommendTests(APITestCase):
             response.json()["recommendations"],
             [],
         )
+
+
+class RecommendationEventTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="eventuser",
+            email="event@test.com",
+            password="pwd",
+            is_verified=True,
+        )
+        cuisine = Cuisine.objects.create(name="Event Cuisine")
+        category = Category.objects.create(name="Event Category")
+        restaurant = Restaurant.objects.create(
+            name="Event Restaurant",
+            cuisine=cuisine,
+        )
+        self.item = MenuItem.objects.create(
+            restaurant=restaurant,
+            category=category,
+            name="Event Menu Item",
+            price=Decimal("100.00"),
+            is_available=True,
+        )
+        self.url = reverse("ai:recommendation-events")
+
+    def test_authenticated_user_can_track_recommendation_event(self):
+        self.client.force_authenticate(self.user)
+        request_id = "00000000-0000-0000-0000-000000000001"
+
+        response = self.client.post(self.url, {
+            "request_id": request_id,
+            "menu_item_id": self.item.id,
+            "event_type": "clicked",
+            "position": 1,
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        event = RecommendationEvent.objects.get(request_id=request_id)
+        self.assertEqual(event.user, self.user)
+        self.assertEqual(event.menu_item, self.item)
+        self.assertEqual(event.event_type, RecommendationEvent.EventType.CLICKED)
+
+    def test_tracking_rejects_unavailable_item(self):
+        self.client.force_authenticate(self.user)
+        self.item.is_available = False
+        self.item.unavailable_reason = "Sold out"
+        self.item.save()
+
+        response = self.client.post(self.url, {
+            "request_id": "00000000-0000-0000-0000-000000000002",
+            "menu_item_id": self.item.id,
+            "event_type": "clicked",
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 # =============================================================

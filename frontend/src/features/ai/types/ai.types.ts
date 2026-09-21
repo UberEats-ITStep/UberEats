@@ -16,4 +16,5 @@ export interface AIRecommendationItem {
 export interface AIRecommendationResponse {
   message: string;
   recommendations: AIRecommendationItem[];
+  recommendation_request_id: string;
 }
