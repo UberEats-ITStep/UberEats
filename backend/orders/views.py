@@ -2,6 +2,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from users.permissions import IsAdminOrAuthenticatedReadOnly, is_admin
+
 from .models import Order
 from .serializers import CheckoutSerializer, OrderSerializer, OrderStatusSerializer
 
@@ -43,24 +45,10 @@ class OrderDetailView(generics.RetrieveAPIView):
 
 
 class OrderStatusView(generics.RetrieveUpdateAPIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdminOrAuthenticatedReadOnly]
     serializer_class = OrderStatusSerializer
 
     def get_queryset(self):
-        user = self.request.user
-
-        if user.is_staff or getattr(user, 'role', '').upper() == 'ADMIN':
+        if is_admin(self.request.user):
             return Order.objects.all()
-
-        return Order.objects.filter(client=user)
-
-    def update(self, request, *args, **kwargs):
-        user = request.user
-
-        if not user.is_staff and getattr(user, 'role', '').upper() != 'ADMIN':
-            return Response(
-                {'detail': 'Only admins can update order status.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        return super().update(request, *args, **kwargs)
+        return Order.objects.filter(client=self.request.user)

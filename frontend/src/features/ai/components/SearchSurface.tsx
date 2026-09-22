@@ -2,6 +2,8 @@ import { useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
+import { useAuth } from '../../../hooks/useAuth';
+import LoginPromptPanel from '../../auth/components/LoginPromptPanel';
 import type { AIRecommendationResponse } from '../types/ai.types';
 import { AIRecommendationItem } from './AIRecommendationItem';
 import { TypewriterEffect } from '../../../components/common/TypewriterEffect';
@@ -39,6 +41,11 @@ export const SearchSurface: FC<SearchSurfaceProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  // AI recommendations are tied to an account. A signed-out visitor gets a way
+  // in instead of the "couldn't process that request" error the API would cause.
+  const showLoginPrompt = !isAuthLoading && !isAuthenticated;
 
   useGSAP(() => {
     let mm = gsap.matchMedia();
@@ -109,7 +116,16 @@ export const SearchSurface: FC<SearchSurfaceProps> = ({
           Close AI Search
         </button>
 
-        {isLoading && (
+        {showLoginPrompt && (
+          <LoginPromptPanel
+            className="flex-1 animate-fade-in"
+            title="Log in to get recommendations"
+            message="BiteUp's AI search picks dishes for you. Log in or create an account to try it."
+            onNavigate={onClose}
+          />
+        )}
+
+        {!showLoginPrompt && isLoading && (
           <div className="flex-1 flex flex-col items-center justify-center py-12 space-y-4 animate-fade-in">
             <p 
               className="text-lg md:text-xl font-serif italic bg-clip-text text-transparent animate-text-shimmer"
@@ -123,7 +139,7 @@ export const SearchSurface: FC<SearchSurfaceProps> = ({
           </div>
         )}
 
-        {error && (
+        {!showLoginPrompt && error && (
           <div className="flex-1 flex flex-col items-center justify-center py-12 text-center animate-fade-in">
             <p className="text-status-error font-medium mb-2">We couldn't process that request.</p>
             <p className="text-sm text-text-secondary mb-6 max-w-sm">{error}</p>
@@ -138,7 +154,7 @@ export const SearchSurface: FC<SearchSurfaceProps> = ({
           </div>
         )}
 
-        {!isLoading && !error && data && (
+        {!showLoginPrompt && !isLoading && !error && data && (
           <div ref={contentRef} className="space-y-6">
             {/* AI Explanation / Leading text */}
             <div className="pb-4 border-b border-border-default">
@@ -169,7 +185,7 @@ export const SearchSurface: FC<SearchSurfaceProps> = ({
           </div>
         )}
 
-        {!isLoading && !error && !data && isOpen && (
+        {!showLoginPrompt && !isLoading && !error && !data && isOpen && (
           <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-text-secondary">
              <p className="font-serif italic text-lg text-text-primary h-8 flex items-center justify-center">
                <TypewriterEffect 

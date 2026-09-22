@@ -38,6 +38,7 @@ class CreatePaymentIntentView(APIView):
 
 
 class StripeWebhookView(APIView):
+    authentication_classes = ()
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):

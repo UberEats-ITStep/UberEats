@@ -299,6 +299,37 @@ class CheckoutSerializer(serializers.Serializer):
 
 
 class OrderStatusSerializer(serializers.ModelSerializer):
+    """
+    Manual (administrator) status changes.
+
+    AWAITING_PAYMENT and PENDING belong to the checkout / Stripe-webhook flow, so
+    they cannot be set by hand. An unpaid order can only be cancelled or declined,
+    never pushed to the kitchen, and finished orders are final.
+    """
+
+    ADMIN_SETTABLE = frozenset({
+        Order.STATUS_ACCEPTED, Order.STATUS_PREPARING, Order.STATUS_READY,
+        Order.STATUS_DELIVERING, Order.STATUS_COMPLETED,
+        Order.STATUS_CANCELLED, Order.STATUS_DECLINED,
+    })
+    FINAL = frozenset({
+        Order.STATUS_COMPLETED, Order.STATUS_CANCELLED, Order.STATUS_DECLINED,
+    })
+
     class Meta:
         model = Order
         fields = ['id', 'status']
+
+    def validate_status(self, value):
+        current = self.instance.status if self.instance is not None else None
+        if value == current:
+            return value
+        if value not in self.ADMIN_SETTABLE:
+            raise serializers.ValidationError(f'Status {value} cannot be set manually.')
+        if current == Order.STATUS_AWAITING_PAYMENT and value not in (
+            Order.STATUS_CANCELLED, Order.STATUS_DECLINED,
+        ):
+            raise serializers.ValidationError('This order has not been paid yet.')
+        if current in self.FINAL:
+            raise serializers.ValidationError(f'A {current} order can no longer be changed.')
+        return value

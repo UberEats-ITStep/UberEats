@@ -272,8 +272,7 @@ Invalid or expired codes return `400 Bad Request` without identifying the cause.
 
 Set the SMTP and password reset values from `.env.example` in `.env` before using
 the endpoints. The `EMAIL_HOST_PASSWORD` value must remain local to the runtime
-environment and must never be committed. For multi-instance deployments, configure
-a shared Django cache so DRF throttling is enforced across all application instances.
+environment and must never be committed. Note: shared Redis-compatible caching is required only if multiple Render instances are deployed and cross-instance throttling is needed.
 
 ### Profile
 

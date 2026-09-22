@@ -2,6 +2,9 @@ from django.db.models import Prefetch
 from rest_framework import viewsets, filters
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.permissions import AllowAny
+
+from users.permissions import IsAdminOrReadOnly
 
 from .models import Category, Cuisine, MenuItem, Restaurant
 from .serializers import (
@@ -20,6 +23,7 @@ class StandardPagination(PageNumberPagination):
 
 
 class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [AllowAny]
     serializer_class = RestaurantListSerializer
     pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -53,13 +57,14 @@ class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
             return RestaurantDetailSerializer
         return RestaurantListSerializer
 
-
 class CategoryCRUD(viewsets.ModelViewSet):
+    permission_classes = [IsAdminOrReadOnly]
     queryset = Category.objects.order_by("id")
     serializer_class = CategorySerializer
 
 
 class MenuItemCRUD(viewsets.ModelViewSet):
+    permission_classes = [IsAdminOrReadOnly]
     queryset = (
         MenuItem.objects.filter(restaurant__is_active=True)
         .order_by("id")
@@ -81,5 +86,6 @@ class MenuItemCRUD(viewsets.ModelViewSet):
 
 
 class CuisineCRUD(viewsets.ModelViewSet):
+    permission_classes = [IsAdminOrReadOnly]
     queryset = Cuisine.objects.order_by("id")
     serializer_class = CuisineSerializer

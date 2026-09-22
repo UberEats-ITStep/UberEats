@@ -29,6 +29,7 @@ from .services.firebase_auth import (
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
+    authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
     throttle_scope = 'auth_register'
@@ -231,6 +232,7 @@ class ChangePasswordView(APIView):
 from .services.email_verification import verify_user_code, generate_verification_code, send_verification_email
 
 class VerifyEmailView(APIView):
+    authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
     throttle_scope = 'verify_email'
 
@@ -260,6 +262,7 @@ class VerifyEmailView(APIView):
 
 class ResendVerificationView(APIView):
     permission_classes = (permissions.AllowAny,)
+    authentication_classes = ()
     throttle_scope = 'resend_verification'
 
     def post(self, request):
