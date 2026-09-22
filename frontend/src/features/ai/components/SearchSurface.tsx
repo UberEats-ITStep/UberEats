@@ -4,6 +4,7 @@ import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import type { AIRecommendationResponse } from '../types/ai.types';
 import { AIRecommendationItem } from './AIRecommendationItem';
+import { TypewriterEffect } from '../../../components/common/TypewriterEffect';
 
 interface SearchSurfaceProps {
   isOpen: boolean;
@@ -14,6 +15,18 @@ interface SearchSurfaceProps {
   onRetry?: () => void;
   query: string;
 }
+
+const AI_SUGGESTIONS = [
+  "What are you craving?",
+  "Try \"something spicy and vegetarian\"",
+  "Try \"a heavy burger with fries\"",
+  "Find me a cozy cafe with great matcha",
+  "I need comfort food delivered fast",
+  "Show me the best rated sushi nearby",
+  "Craving a late-night sweet treat?",
+  "Healthy lunch under 500 calories",
+  "Family dinner options with pizza"
+];
 
 export const SearchSurface: FC<SearchSurfaceProps> = ({
   isOpen,
@@ -158,11 +171,11 @@ export const SearchSurface: FC<SearchSurfaceProps> = ({
 
         {!isLoading && !error && !data && isOpen && (
           <div className="flex-1 flex flex-col items-center justify-center py-12 text-center text-text-secondary">
-             <p className="font-serif italic text-lg text-text-muted">
-               What are you craving?
-             </p>
-             <p className="text-sm mt-2 max-w-xs">
-               Try "something spicy and vegetarian" or "a heavy burger with fries".
+             <p className="font-serif italic text-lg text-text-primary h-8 flex items-center justify-center">
+               <TypewriterEffect 
+                 strings={AI_SUGGESTIONS} 
+                 pauseDuration={5000}
+               />
              </p>
           </div>
         )}

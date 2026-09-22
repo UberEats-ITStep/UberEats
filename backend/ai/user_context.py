@@ -4,6 +4,7 @@ from decimal import Decimal
 from orders.models import Order
 from favorites.models import Favorite
 from reviews.models import Review
+from users.models import UserEvent
 
 
 class UserContextBuilder:
@@ -37,7 +38,7 @@ class UserContextBuilder:
         highly_rated_restaurants = self._get_highly_rated_restaurants(user)
 
         if not orders:
-            context = self._empty_context()
+            context = self._empty_context(user)
             context["review_count"] = review_count
             context["favorite_restaurants"] = favorite_restaurants
             context["highly_rated_restaurants"] = highly_rated_restaurants
@@ -119,9 +120,13 @@ class UserContextBuilder:
                     "items": recent_order_items[:10],
                 })
 
+
         average_order_value = (
             sum(order_values, Decimal("0")) / len(order_values)
         )
+        
+        # Determine consumed_item_ids from the order history
+        consumed_item_ids = {item.menu_item_id for order in orders for item in order.items.all() if item.menu_item_id}
 
         return {
             "has_history": True,
@@ -149,18 +154,64 @@ class UserContextBuilder:
                 float(average_order_value),
                 2,
             ),
-            "typical_price_range": self._calculate_price_range(
-                order_values
-            ),
             "dietary_preferences": self._build_dietary_preferences(
                 vegetarian_count,
                 vegan_count,
                 purchased_item_count,
             ),
             "recent_orders": recent_orders,
+            "recent_events": self._get_recent_events(user),
+            "consumed_item_ids": list(consumed_item_ids),
         }
 
-    def _empty_context(self):
+
+
+
+    def _get_recent_events(self, user):
+        # Fetch the most recent 100 events
+        events = list(UserEvent.objects.filter(user=user).order_by("-created_at")[:100])
+        recent_searches = []
+        recent_ai_searches = []
+        recent_viewed_items = set()
+        recent_viewed_restaurants = set()
+        recent_cart_adds = set()
+        recent_cart_removes = set()
+
+        for event in events:
+            evt_type = event.event_type
+            meta = event.metadata
+            
+            if evt_type == UserEvent.EventType.SEARCH:
+                q = meta.get("query")
+                if q and q not in recent_searches:
+                    recent_searches.append(q)
+            elif evt_type == UserEvent.EventType.AI_SEARCH:
+                q = meta.get("query")
+                if q and q not in recent_ai_searches:
+                    recent_ai_searches.append(q)
+            elif evt_type == UserEvent.EventType.MENU_ITEM_VIEW:
+                item_id = meta.get("menu_item_id")
+                if item_id: recent_viewed_items.add(item_id)
+            elif evt_type == UserEvent.EventType.RESTAURANT_VIEW:
+                rest_id = meta.get("restaurant_id")
+                if rest_id: recent_viewed_restaurants.add(rest_id)
+            elif evt_type == UserEvent.EventType.ADD_TO_CART:
+                item_id = meta.get("menu_item_id")
+                if item_id: recent_cart_adds.add(item_id)
+            elif evt_type == UserEvent.EventType.REMOVE_FROM_CART:
+                item_id = meta.get("menu_item_id")
+                if item_id: recent_cart_removes.add(item_id)
+
+        return {
+            "searches": recent_searches[:5],
+            "ai_searches": recent_ai_searches[:5],
+            "viewed_item_ids": list(recent_viewed_items),
+            "viewed_restaurant_ids": list(recent_viewed_restaurants),
+            "cart_add_item_ids": list(recent_cart_adds),
+            "cart_remove_item_ids": list(recent_cart_removes)
+        }
+
+    def _empty_context(self, user):
         return {
             "has_history": False,
             "completed_order_count": 0,
@@ -180,6 +231,8 @@ class UserContextBuilder:
                 "vegan_tendency": False,
             },
             "recent_orders": [],
+            "recent_events": self._get_recent_events(user),
+            "consumed_item_ids": [],
         }
 
     @staticmethod
