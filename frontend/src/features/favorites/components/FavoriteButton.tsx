@@ -6,6 +6,7 @@ import { useRestaurantFavorite } from '../hooks/useRestaurantFavorite';
 
 export interface FavoriteButtonProps {
   restaurantId: number;
+  iconOnly?: boolean;
   className?: string;
 }
 
@@ -24,7 +25,11 @@ const HeartIcon: FC<{ filled?: boolean }> = ({ filled = false }) => (
   </svg>
 );
 
-const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '' }) => {
+const FavoriteButton: FC<FavoriteButtonProps> = ({
+  restaurantId,
+  iconOnly = false,
+  className = '',
+}) => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { isFavorite, isLoading, toggleFavorite } = useRestaurantFavorite(restaurantId);
@@ -48,14 +53,14 @@ const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '' 
       type="button"
       variant={isFavorite ? 'secondary' : 'outline'}
       size="sm"
-      className={className}
+      className={`${iconOnly ? '!p-2' : ''} ${className}`}
       leftIcon={<HeartIcon filled={isFavorite} />}
       onClick={handleClick}
       isLoading={isLoading}
       aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
       title={buttonTitle}
     >
-      {isFavorite ? 'Saved' : 'Save'}
+      {!iconOnly && (isFavorite ? 'Saved' : 'Save')}
     </Button>
   );
 };
