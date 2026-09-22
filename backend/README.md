@@ -1,0 +1,391 @@
+## Quick setup
+
+Requirements: Python 3.10+ and a running PostgreSQL server.
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Copy `.env.example` to `.env` and add local secrets. `.env` is ignored by Git
+and must never be committed.
+
+### Shared Neon database
+
+Normal development and deployed web processes use the pooled Neon connection:
+
+```dotenv
+DATABASE_URL=postgresql://ROLE:PASSWORD@HOST-POOLER/DATABASE?sslmode=require&channel_binding=require
+DATABASE_CONN_MAX_AGE=0
+```
+
+Get the real value from the Neon **Connect** dialog or the team's secret
+manager. Never expose it through a `VITE_*` variable or frontend code. The
+application preserves the URL's TLS options, checks connection health, and
+disables server-side cursors for PgBouncer compatibility.
+
+Use Neon's direct connection (the hostname does not contain `-pooler`) for
+schema migrations. Generate and commit migrations during development, review
+them, and apply committed migrations with:
+
+```bash
+DATABASE_URL='<DIRECT_OWNER_URL>' python manage.py migrate --noinput
+```
+
+This is a temporary environment override for that one command; do not replace
+the pooled `neondb_user` URL in `.env`. The normal workflow for every future
+migration is therefore:
+
+```bash
+cd backend
+source .venv/bin/activate
+DATABASE_URL='<DIRECT_OWNER_URL>' python manage.py migrate --noinput
+```
+
+Retrieve the direct owner URL from Neon or the team's secret manager. Never
+paste it into source code, commit it, or save it in shell history on a shared
+machine.
+
+Do not run `makemigrations` automatically during deployment. Developers who
+only run the application should use a restricted runtime role. The migration
+role owns the schema; keep its URL in CI/deployment secrets rather than `.env`.
+
+Recommended grants, executed in the Neon SQL Editor as `neondb_owner` after
+creating the `neondb_user` role:
+
+```sql
+GRANT CONNECT ON DATABASE biteupdb TO neondb_user;
+GRANT USAGE ON SCHEMA public TO neondb_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO neondb_user;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO neondb_user;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO neondb_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO neondb_user;
+```
+
+Do not grant `neondb_user` `CREATE` on the schema, `CREATEDB`, `CREATEROLE`, or
+ownership. Use its pooled URL for the application and the direct owner URL only
+for migrations.
+
+In production, also set `DJANGO_DEBUG=false`, a unique `DJANGO_SECRET_KEY`,
+explicit `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, and
+`CSRF_TRUSTED_ORIGINS`. Production enables secure cookies and HTTPS redirect;
+set `DJANGO_BEHIND_HTTPS_PROXY=true` only behind a trusted TLS-terminating
+proxy. Restaurant open-state evaluation uses the `Europe/Kyiv` timezone.
+
+For a temporary local run without PostgreSQL, set `DJANGO_USE_SQLITE=true` in
+`.env`. This creates the ignored `backend/db.sqlite3` file and must not be used
+for Neon or production.
+
+### Cloudinary media storage
+
+Restaurant and menu-item uploads use Django's storage API. In debug mode,
+images use local filesystem storage unless all three Cloudinary variables are
+configured. Production requires Cloudinary and fails during startup when the
+configuration is incomplete:
+
+```dotenv
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+```
+
+Keep these values in the runtime environment or an ignored `.env` file. Never
+commit them or expose them through frontend variables. Uploaded files use
+stable paths under `biteup/restaurants/<catalog-key>/` and
+`biteup/menu-items/<catalog-key>/<item-slug>/`; API serializers return secure,
+optimized Cloudinary URLs while preserving the existing `image` and
+`image_url` response fields.
+
+```bash
+python manage.py migrate
+python manage.py runserver
+```
+
+The API is at `http://127.0.0.1:8000/api/`.
+
+## Restaurants backend
+
+The restaurants app now aligns its core data model with the shared schema:
+
+- `cuisines` are standalone and referenced by `restaurants.cuisine`
+- `categories` are global and reused by `menu_items`
+- restaurant detail responses group `menu_items` cleanly inside their respective `categories`
+
+Useful commands:
+
+```bash
+python manage.py migrate
+python manage.py test restaurants --keepdb
+```
+
+## Authentication endpoints
+
+### Firebase / Google authentication
+
+Firebase proves the user's identity; Django remains the source of truth for the
+user, profile, permissions, orders, favorites, reviews, and addresses. The
+frontend sends a Firebase ID token to `POST /api/auth/firebase/`; after server-
+side verification, Django returns the same SimpleJWT access and refresh tokens
+used by password login.
+
+Backend-only configuration:
+
+```dotenv
+FIREBASE_AUTH_ENABLED=true
+FIREBASE_PROJECT_ID=bite-up
+GOOGLE_APPLICATION_CREDENTIALS_JSON=<complete-service-account-json>
+```
+
+The service-account JSON is a private credential. Keep it only in `.env` or the
+deployment provider's secret store and never expose it as a `VITE_*` variable.
+The Firebase UID is uniquely linked to a Django user. A Firebase-verified email
+may link an existing account without replacing its password or profile data;
+conflicting UID/email mappings are rejected.
+
+After pulling the Firebase integration, install requirements and apply the
+committed migration before starting the backend:
+
+```bash
+pip install -r requirements.txt
+python manage.py migrate
+```
+
+### Register
+
+`POST /api/auth/register/`
+
+Phone number and address are optional. New frontend registrations use the `Client` role.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/register/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "SecurePass123!",
+    "role": "Client",
+    "phone_number": "+380001112233",
+    "address": "Kyiv"
+  }'
+```
+
+Response (`201 Created`):
+
+```json
+{
+  "email": "user@example.com",
+  "role": "Client"
+}
+```
+
+An existing email returns `400 Bad Request`:
+
+```json
+{
+  "email": ["user with this email already exists."]
+}
+```
+
+### Login
+
+`POST /api/auth/login/`
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"SecurePass123!"}'
+```
+
+Response (`200 OK`):
+
+```json
+{
+  "refresh": "<refresh-token>",
+  "access": "<access-token>"
+}
+```
+
+Unknown emails and incorrect passwords return `401 Unauthorized` with a clear `detail` message.
+
+### Refresh access token
+
+`POST /api/auth/refresh/`
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/refresh/ \
+  -H "Content-Type: application/json" \
+  -d '{"refresh":"<refresh-token>"}'
+```
+
+Response (`200 OK`):
+
+```json
+{
+  "access": "<new-access-token>"
+}
+```
+
+### Forgot password
+
+`POST /api/auth/forgot-password/`
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/forgot-password/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+```
+
+The response is always `200 OK` with the same message, whether or not the email
+belongs to an account. This prevents email enumeration. When the account exists,
+the configured SMTP provider sends a six-digit code. Requests during the resend
+cooldown do not send a second code.
+
+```json
+{
+  "detail": "If an account exists, a reset code has been sent."
+}
+```
+
+### Reset password
+
+`POST /api/auth/reset-password/`
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/auth/reset-password/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email":"user@example.com",
+    "verification_code":"123456",
+    "new_password":"NewSecurePass123!",
+    "confirm_password":"NewSecurePass123!"
+  }'
+```
+
+The code is single-use and expires after `PASSWORD_RESET_CODE_TTL_SECONDS`.
+Invalid or expired codes return `400 Bad Request` without identifying the cause.
+
+### Password reset configuration
+
+Set the SMTP and password reset values from `.env.example` in `.env` before using
+the endpoints. The `EMAIL_HOST_PASSWORD` value must remain local to the runtime
+environment and must never be committed. Note: shared Redis-compatible caching is required only if multiple Render instances are deployed and cross-instance throttling is needed.
+
+### Profile
+
+`GET /api/profile/` requires an access token.
+
+```bash
+curl http://127.0.0.1:8000/api/profile/ \
+  -H "Authorization: Bearer <access-token>"
+```
+
+Response (`200 OK`):
+
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "phone_number": "+380001112233",
+  "address": "Kyiv",
+  "avatar": "avatar_01",
+  "default_address": null
+}
+```
+
+The same endpoint accepts `PUT` and `PATCH` to update profile fields and the
+selected preset `avatar`. Valid avatars are exposed by
+`GET /api/profile/avatar-options/`. The `address` field is kept only for
+backwards compatibility; new clients should use saved delivery addresses.
+
+```bash
+curl -X PATCH http://127.0.0.1:8000/api/profile/ \
+  -H "Authorization: Bearer <access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"avatar":"avatar_03"}'
+```
+
+### Saved delivery addresses
+
+All saved-address endpoints require `Authorization: Bearer <access-token>`.
+Addresses are scoped to the authenticated user and never expose a user or
+profile relationship ID.
+
+- `GET /api/profile/addresses/` lists the user's saved addresses.
+- `POST /api/profile/addresses/` creates an address.
+- `GET`, `PATCH`, `DELETE /api/profile/addresses/<id>/` reads, updates, or removes an address.
+- `POST /api/profile/addresses/<id>/set-default/` selects the default address.
+- `GET /api/profile/addresses/default/` returns the current default address.
+
+```json
+{
+  "label": "Home",
+  "formatted_address": "Rivne, Soborna Street 12",
+  "street": "Soborna Street",
+  "building": "12",
+  "apartment": "44",
+  "entrance": "2",
+  "floor": 3,
+  "delivery_notes": "Call when near",
+  "contact_phone": "+380501234567",
+  "latitude": "50.619000",
+  "longitude": "26.250000"
+}
+```
+
+The first address becomes default automatically. Selecting another default
+address clears the prior default atomically. Deleting the default promotes the
+oldest remaining address, if one exists. Latitude and longitude are accepted
+only in an address create/update payload, must be supplied together, and must
+be within the valid geographic ranges. They are derived by the frontend address
+resolver and must not be presented as separate user-editable inputs.
+
+Existing non-empty `Profile.address` values are preserved by the data migration
+as a default `Home` saved address. Because legacy text cannot be safely split
+into street/building data or coordinates, it remains available for display and
+must be confirmed by the frontend resolver before it can be used for checkout.
+
+### Checkout with a saved address
+
+`POST /api/orders/checkout/` accepts either the existing structured manual
+address fields or an owned saved-address ID:
+
+```json
+{
+  "delivery_address_id": 1
+}
+```
+
+The selected address fields and coordinates are copied to the new order. Later
+changes to the saved address do not affect existing orders.
+
+## JWT requirements
+
+- Send the access token as `Authorization: Bearer <access-token>`.
+- Access tokens expire after 60 minutes.
+- Refresh tokens expire after 7 days and are used only with `/api/auth/refresh/`.
+- Registration, login, and token refresh do not require authentication.
+- Profile requests require a valid access token.
+- Missing, invalid, or expired access tokens return `401 Unauthorized`.
+
+## Favorites
+
+Apply the committed Favorites migration and run its tests:
+
+```bash
+python manage.py migrate
+python manage.py test favorites --keepdb
+```
+
+All endpoints require `Authorization: Bearer <access-token>`:
+
+- `GET /api/favorites/` lists the current user's favorites.
+- `POST /api/favorites/` with `{"restaurant": <id>}` adds one.
+- `DELETE /api/favorites/<id>/` removes the current user's favorite.
+- `GET /api/favorites/check/?restaurant=<id>` returns favorite status.
+
+Duplicate favorites return `400`. Favorites owned by another user are neither
+listed nor removable.

@@ -10,74 +10,178 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
+import sys
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
+
+from config.database import (
+    DatabaseConfigurationError,
+    add_connection_safety,
+    database_config_from_environment,
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
+
+
+def required_environment(name, default=None):
+    value = os.getenv(name, default)
+    if value is None:
+        raise ImproperlyConfigured(f"{name} must be set.")
+    return value
+
+
+def environment_flag(name, default="false"):
+    value = required_environment(name, default).lower()
+    if value not in {"true", "false"}:
+        raise ImproperlyConfigured(f"{name} must be either true or false.")
+    return value == "true"
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-1fznboq%1zi(aeu&e^s2u+zeipb+-*ug5%)sl-k&6mi_ed*4lr'
+SECRET_KEY = required_environment("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = environment_flag("DJANGO_DEBUG", "true")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in required_environment("DJANGO_ALLOWED_HOSTS", "*").split(",")
+    if host.strip()
+]
+if not DEBUG and (not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS):
+    raise ImproperlyConfigured(
+        "DJANGO_ALLOWED_HOSTS must list explicit hostnames in production."
+    )
 
+if not DEBUG:
+    SECURE_SSL_REDIRECT = environment_flag("DJANGO_SECURE_SSL_REDIRECT")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    if environment_flag("DJANGO_BEHIND_HTTPS_PROXY"):
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+cloudinary_config = {
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME", ""),
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY", ""),
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET", ""),
+}
+CLOUDINARY_ENABLED = all(cloudinary_config.values())
+CLOUDINARY_STORAGE = cloudinary_config
+
+if not DEBUG and not CLOUDINARY_ENABLED:
+    raise ImproperlyConfigured(
+        "Cloudinary must be configured in production. Set "
+        "CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET."
+    )
+
+if CLOUDINARY_ENABLED:
+    STORAGES = {
+        "default": {
+            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "corsheaders",
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
+    "django_filters",
+    "users",
+    "restaurants",
+    "orders",
+    "favorites",
+    "cart",
+    "reviews",
+    "ai",
+    "payments",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if environment_flag("DJANGO_USE_SQLITE", "false"):
+    if not DEBUG:
+        raise ImproperlyConfigured("DJANGO_USE_SQLITE is only allowed in debug mode.")
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
+else:
+    try:
+        DATABASES = {
+            "default": add_connection_safety(database_config_from_environment())
+        }
+    except DatabaseConfigurationError as error:
+        raise ImproperlyConfigured(str(error)) from error
 
 
 # Password validation
@@ -85,16 +189,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -102,9 +206,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "Europe/Kyiv"
 
 USE_I18N = True
 
@@ -114,4 +218,144 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
+
+configured_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+CORS_ALLOW_ALL_ORIGINS = DEBUG and not configured_cors_origins
+CORS_ALLOWED_ORIGINS = configured_cors_origins
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+AUTH_USER_MODEL = "users.User"
+
+PASSWORD_RESET_CODE_TTL_SECONDS = int(
+    os.getenv("PASSWORD_RESET_CODE_TTL_SECONDS", "600")
+)
+PASSWORD_RESET_RESEND_COOLDOWN_SECONDS = int(
+    os.getenv("PASSWORD_RESET_RESEND_COOLDOWN_SECONDS", "60")
+)
+
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@example.com")
+
+REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.ScopedRateThrottle",),
+    "DEFAULT_THROTTLE_RATES": {
+        "ai_recommend": "5/min",
+        "auth_login": "10/min",
+        "auth_register": "5/min",
+        "auth_firebase": "10/min",
+        "favorites": "60/min",
+        "verify_email": "10/hour",
+        "resend_verification": "3/hour",
+        "password_reset_request": os.getenv(
+            "PASSWORD_RESET_REQUEST_THROTTLE_RATE",
+            "5/hour",
+        ),
+        "password_reset_confirm": os.getenv(
+            "PASSWORD_RESET_CONFIRM_THROTTLE_RATE",
+            "10/hour",
+        ),
+        "change_password": os.getenv(
+            "CHANGE_PASSWORD_THROTTLE_RATE",
+            "5/hour",
+        ),
+    },
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+# Order Lifecycle Simulation (Development Only)
+# List of tuples: (Target Status, Delay in seconds before transitioning to it)
+ORDER_SIMULATION_TRANSITIONS = [
+    ("ACCEPTED", 15),
+    ("PREPARING", 15),
+    ("READY", 15),
+    ("DELIVERING", 15),
+    ("COMPLETED", 15),
+]
+
+# --- Email Verification ---
+EMAIL_VERIFICATION_CODE_EXPIRATION_MINUTES = 15
+
+if os.getenv("SMTP_HOST"):
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.getenv("SMTP_HOST")
+    EMAIL_PORT = int(os.getenv("SMTP_PORT", 587))
+    EMAIL_HOST_USER = os.getenv("SMTP_USER")
+    EMAIL_HOST_PASSWORD = os.getenv("SMTP_PASS")
+    EMAIL_USE_TLS = os.getenv("SMTP_ENCRYPTION", "tls").lower() == "tls"
+    EMAIL_USE_SSL = os.getenv("SMTP_ENCRYPTION", "").lower() == "ssl"
+elif DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+# Automatically use the Brevo verified email (SMTP_USER) as the sender if not explicitly set
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    os.getenv("SMTP_DEFAULT_FROM_EMAIL", os.getenv("SMTP_USER", "webmaster@localhost")),
+)
+
+# Cache (required for DRF Throttling)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
+    }
+}
+
+
+if {"test", "makemigrations"} & set(sys.argv):
+    if "DEFAULT_THROTTLE_CLASSES" in REST_FRAMEWORK:
+        REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = []
+
+# AI Configuration
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+GROQ_FALLBACK_MODEL = os.getenv("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+
+# Stripe Configuration
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', 'sk_test_mock')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', 'whsec_mock')
+PAYMENT_CURRENCY = os.getenv('PAYMENT_CURRENCY', 'uah')
+
+# Firebase proves identity; Django remains responsible for users, permissions,
+# profiles, and application API sessions.
+FIREBASE_AUTH_ENABLED = environment_flag("FIREBASE_AUTH_ENABLED", "false")
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+GOOGLE_APPLICATION_CREDENTIALS_JSON = os.getenv(
+    "GOOGLE_APPLICATION_CREDENTIALS_JSON", ""
+)
