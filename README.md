@@ -6,11 +6,6 @@
 
 A full-stack food delivery platform focused on scalable architecture, clean code, modern development practices, and future AI-powered features.
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=UberEats-ITStep_UberEats&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=UberEats-ITStep_UberEats)
-[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=UberEats-ITStep_UberEats&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=UberEats-ITStep_UberEats)
-[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=UberEats-ITStep_UberEats&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=UberEats-ITStep_UberEats)
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=UberEats-ITStep_UberEats&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=UberEats-ITStep_UberEats)
-
 [![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=green)](https://www.djangoproject.com/)
 [![Django REST Framework](https://img.shields.io/badge/DRF-A30000?style=for-the-badge&logo=django&logoColor=white)](https://www.django-rest-framework.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
