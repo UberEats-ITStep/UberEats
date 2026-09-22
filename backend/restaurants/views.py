@@ -1,0 +1,91 @@
+from django.db.models import Prefetch
+from rest_framework import viewsets, filters
+from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.permissions import AllowAny
+
+from users.permissions import IsAdminOrReadOnly
+
+from .models import Category, Cuisine, MenuItem, Restaurant
+from .serializers import (
+    CategorySerializer,
+    CuisineSerializer,
+    MenuItemSerializer,
+    RestaurantDetailSerializer,
+    RestaurantListSerializer,
+)
+
+
+class StandardPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [AllowAny]
+    serializer_class = RestaurantListSerializer
+    pagination_class = None
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        "cuisine": ["exact"],
+        "rating": ["gte"],
+    }
+    search_fields = ["name", "description", "cuisine__name", "menu_items__name"]
+    ordering_fields = ["rating", "delivery_time", "name"]
+    ordering = ["id"]
+
+    def get_queryset(self):
+        queryset = (
+            Restaurant.objects.filter(is_active=True)
+            .select_related("cuisine")
+            .prefetch_related("opening_hours")
+        )
+
+        if self.action == "retrieve":
+            return queryset.prefetch_related(
+                Prefetch(
+                    "menu_items",
+                    queryset=MenuItem.objects.order_by("id").select_related("category").prefetch_related("tags"),
+                )
+            )
+
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return RestaurantDetailSerializer
+        return RestaurantListSerializer
+
+class CategoryCRUD(viewsets.ModelViewSet):
+    permission_classes = [IsAdminOrReadOnly]
+    queryset = Category.objects.order_by("id")
+    serializer_class = CategorySerializer
+
+
+class MenuItemCRUD(viewsets.ModelViewSet):
+    permission_classes = [IsAdminOrReadOnly]
+    queryset = (
+        MenuItem.objects.filter(restaurant__is_active=True)
+        .order_by("id")
+        .select_related("restaurant", "category")
+    )
+    serializer_class = MenuItemSerializer
+    pagination_class = StandardPagination
+
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        "category": ["exact"],
+        "restaurant": ["exact"],
+        "is_available": ["exact"],
+        "price": ["gte", "lte"],
+    }
+    search_fields = ["name"]
+    ordering_fields = ["price", "name"]
+    ordering = ["category", "name"]
+
+
+class CuisineCRUD(viewsets.ModelViewSet):
+    permission_classes = [IsAdminOrReadOnly]
+    queryset = Cuisine.objects.order_by("id")
+    serializer_class = CuisineSerializer
