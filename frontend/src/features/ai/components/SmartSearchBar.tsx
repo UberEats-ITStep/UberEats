@@ -73,7 +73,6 @@ export const SmartSearchBar: FC = () => {
     setIsAiMode(newMode);
     
     if (newMode) {
-      setLocalQuery('');
       reset();
       if (searchParams.has('q')) {
         searchParams.delete('q');
@@ -82,7 +81,13 @@ export const SmartSearchBar: FC = () => {
       setTimeout(() => inputRef.current?.focus(), 0);
     } else {
       reset();
-      setLocalQuery(searchParams.get('q') || '');
+      if (localQuery.trim()) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set('q', localQuery);
+        setSearchParams(nextParams);
+      } else {
+        setLocalQuery(searchParams.get('q') || '');
+      }
     }
   };
 

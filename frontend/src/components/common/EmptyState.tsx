@@ -20,10 +20,20 @@ export const EmptyState: FC<EmptyStateProps> = ({
       className={`flex flex-col items-center justify-center rounded-xl border border-border-default bg-surface p-12 text-center shadow-subtle ${className}`}
     >
       {icon ? (
-        <div className="mb-4 text-4xl text-text-muted">{icon}</div>
+        <div className="mb-6 text-text-primary">{icon}</div>
       ) : (
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary text-2xl text-text-muted">
-          🍽️
+        <div className="mb-6 flex justify-center text-text-primary">
+          <svg
+            viewBox="0 0 64 64"
+            className="h-14 w-14"
+            aria-hidden="true"
+          >
+            {/* Bag body */}
+            <rect x="16" y="26" width="32" height="34" className="stroke-text-primary" strokeWidth="1.5" fill="none" />
+            
+            {/* Bag handles */}
+            <path d="M26 26 C 26 12, 38 12, 38 26" className="stroke-text-primary" strokeWidth="1.5" fill="none" />
+          </svg>
         </div>
       )}
       <h3 className="text-section-title">{title}</h3>

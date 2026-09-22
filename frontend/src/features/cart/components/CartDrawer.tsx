@@ -1,12 +1,15 @@
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../../context/CartContext';
+import { useAuth } from '../../../hooks/useAuth';
 import { useRestaurantDetails } from '../../restaurants/hooks/useRestaurantDetails';
 import { Drawer, Button, EmptyState, Alert } from '../../../components/common';
+import LoginPromptPanel from '../../auth/components/LoginPromptPanel';
 import { formatPrice } from '../../../utils/currency';
 
 export const CartDrawer: FC = () => {
   const { cart, isDrawerOpen, setIsDrawerOpen, isLoading, error, updateQuantity, removeFromCart, cartTotal, itemCount } = useCart();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
 
   // Get restaurant details for the current cart
@@ -18,6 +21,20 @@ export const CartDrawer: FC = () => {
   };
 
   const renderContent = () => {
+    // The cart belongs to an account: a visitor gets a way in, not an empty
+    // cart or an authentication error.
+    if (!isAuthLoading && !isAuthenticated) {
+      return (
+        <div className="flex h-full flex-col justify-center">
+          <LoginPromptPanel
+            title="Log in to see your cart"
+            message="Your cart is saved to your account. Log in or create one to start your order."
+            onNavigate={() => setIsDrawerOpen(false)}
+          />
+        </div>
+      );
+    }
+
     if (isLoading && !cart) {
       return (
         <div className="flex h-full flex-col justify-center space-y-4 p-4 animate-pulse">

@@ -131,3 +131,29 @@ def create_user_profile(sender, instance, created, **kwargs):
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
     instance.profile.save()
+
+class UserEvent(models.Model):
+    class EventType(models.TextChoices):
+        RESTAURANT_VIEW = 'RESTAURANT_VIEW'
+        MENU_ITEM_VIEW = 'MENU_ITEM_VIEW'
+        SEARCH = 'SEARCH'
+        AI_SEARCH = 'AI_SEARCH'
+        ADD_TO_CART = 'ADD_TO_CART'
+        REMOVE_FROM_CART = 'REMOVE_FROM_CART'
+        FAVORITE_RESTAURANT = 'FAVORITE_RESTAURANT'
+        ORDER_COMPLETED = 'ORDER_COMPLETED'
+        REVIEW_CREATED = 'REVIEW_CREATED'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='events')
+    event_type = models.CharField(max_length=50, choices=EventType.choices)
+    metadata = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'event_type', 'created_at']),
+            models.Index(fields=['user', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.event_type} at {self.created_at}"

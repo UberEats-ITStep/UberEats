@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import DeliveryAddress, Profile, User
+from .models import DeliveryAddress, Profile, User, UserEvent
 
 
 PHONE_NUMBER_VALIDATOR = RegexValidator(
@@ -191,6 +191,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    role = serializers.ChoiceField(choices=[('CLIENT', 'CLIENT')], required=False, default='CLIENT')
     phone_number = serializers.CharField(
         write_only=True,
         required=False,
@@ -336,3 +337,14 @@ class ChangePasswordSerializer(serializers.Serializer):
         password = self.validated_data["new_password"]
         user.set_password(password)
         user.save()
+
+class UserEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserEvent
+        fields = ['event_type', 'metadata', 'created_at']
+        read_only_fields = ['created_at']
+
+    def validate_event_type(self, value):
+        if value not in UserEvent.EventType.values:
+            raise serializers.ValidationError(f"Invalid event type: {value}")
+        return value

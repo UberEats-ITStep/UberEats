@@ -15,9 +15,11 @@ from .views import (
     ChangePasswordView,
     VerifyEmailView,
     ResendVerificationView,
+    UserEventCreateView,
 )
 
 urlpatterns = [
+    path('events/', UserEventCreateView.as_view(), name='user-events'),
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/firebase/', FirebaseLoginView.as_view(), name='firebase-login'),

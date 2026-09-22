@@ -17,6 +17,7 @@ from .serializers import (
     RegisterSerializer,
     ResetPasswordSerializer,
     ChangePasswordSerializer,
+    UserEventSerializer,
 )
 from .services.password_reset import PasswordResetService
 from .services.firebase_auth import (
@@ -28,6 +29,7 @@ from .services.firebase_auth import (
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
+    authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
     serializer_class = RegisterSerializer
     throttle_scope = 'auth_register'
@@ -230,6 +232,7 @@ class ChangePasswordView(APIView):
 from .services.email_verification import verify_user_code, generate_verification_code, send_verification_email
 
 class VerifyEmailView(APIView):
+    authentication_classes = ()
     permission_classes = (permissions.AllowAny,)
     throttle_scope = 'verify_email'
 
@@ -259,6 +262,7 @@ class VerifyEmailView(APIView):
 
 class ResendVerificationView(APIView):
     permission_classes = (permissions.AllowAny,)
+    authentication_classes = ()
     throttle_scope = 'resend_verification'
 
     def post(self, request):
@@ -280,3 +284,10 @@ class ResendVerificationView(APIView):
             return Response({'message': 'Verification email sent.'}, status=status.HTTP_200_OK)
         except ValueError as e:
             return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UserEventCreateView(generics.CreateAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = UserEventSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

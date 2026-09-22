@@ -2,19 +2,18 @@ import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/common';
 import { useAuth } from '../../../hooks/useAuth';
-import { useFavorites } from '../../../context/FavoritesContext';
+import { useRestaurantFavorite } from '../hooks/useRestaurantFavorite';
 
 export interface FavoriteButtonProps {
   restaurantId: number;
   className?: string;
-  iconOnly?: boolean;
 }
 
 const HeartIcon: FC<{ filled?: boolean }> = ({ filled = false }) => (
   <svg
     viewBox="0 0 24 24"
     aria-hidden="true"
-    className="h-5 w-5 transition-transform group-hover:scale-110"
+    className="h-4 w-4"
     fill={filled ? 'currentColor' : 'none'}
     stroke="currentColor"
     strokeWidth="1.8"
@@ -25,49 +24,24 @@ const HeartIcon: FC<{ filled?: boolean }> = ({ filled = false }) => (
   </svg>
 );
 
-const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '', iconOnly = false }) => {
+const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '' }) => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const { isFavorite: checkFavorite, toggleFavorite } = useFavorites();
-  
-  const isFavorite = checkFavorite(restaurantId);
+  const { isFavorite, isLoading, toggleFavorite } = useRestaurantFavorite(restaurantId);
 
   let buttonTitle = 'Log in to save favorites';
   if (isAuthenticated) {
     buttonTitle = isFavorite ? 'Remove from favorites' : 'Add to favorites';
   }
 
-  const handleClick = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
+  const handleClick = async () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
 
-    try {
-      await toggleFavorite(restaurantId);
-    } catch (err) {
-      console.error('Failed to toggle favorite', err);
-    }
+    await toggleFavorite();
   };
-
-  if (iconOnly) {
-    return (
-      <button
-        type="button"
-        className={`group p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors shadow-sm ${
-          isFavorite ? 'bg-primary text-surface hover:bg-primary-hover shadow-md' : 'bg-surface/80 text-text-secondary hover:bg-surface hover:text-primary backdrop-blur-sm'
-        } ${className}`}
-        onClick={handleClick}
-        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-        title={buttonTitle}
-      >
-        <HeartIcon filled={isFavorite} />
-      </button>
-    );
-  }
 
   return (
     <Button
@@ -77,6 +51,7 @@ const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '',
       className={className}
       leftIcon={<HeartIcon filled={isFavorite} />}
       onClick={handleClick}
+      isLoading={isLoading}
       aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
       title={buttonTitle}
     >

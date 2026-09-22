@@ -7,19 +7,47 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
 
 interface RefreshResponse {
   access: string;
+  refresh?: string;
 }
 
 export const AUTH_LOGOUT_EVENT = 'auth:logout';
 
-const PUBLIC_API_PATHS = new Set([
-  '/restaurants/',
-  '/cuisines/',
-  '/categories/',
+const PUBLIC_AUTH_PATHS = new Set([
+  '/auth/login/',
+  '/auth/register/',
+  '/auth/firebase/',
+  '/auth/refresh/',
+  '/auth/verify-email/',
+  '/auth/resend-verification/',
+  '/auth/forgot-password/',
+  '/auth/reset-password/',
 ]);
 
-const isPublicRequest = (url?: string) => {
-  const path = url?.split('?')[0];
-  return path ? PUBLIC_API_PATHS.has(path) : false;
+const PUBLIC_READ_PATHS = [
+  '/restaurants',
+  '/cuisines',
+  '/categories',
+  '/menu-items',
+  '/menuItems',
+];
+
+const getPath = (url?: string) => url?.split('?')[0];
+
+const isPublicAuthPath = (url?: string) => {
+  const path = getPath(url);
+  return path ? PUBLIC_AUTH_PATHS.has(path) : false;
+};
+
+const isPublicRequest = (config: Pick<InternalAxiosRequestConfig, 'url' | 'method'>) => {
+  if (isPublicAuthPath(config.url)) {
+    return true;
+  }
+
+  const path = getPath(config.url);
+  if (!path || (config.method ?? 'get').toLowerCase() !== 'get') {
+    return false;
+  }
+  return PUBLIC_READ_PATHS.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 };
 
 const apiClient = axios.create({
@@ -32,7 +60,7 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
-    if (token && config.headers && !isPublicRequest(config.url)) {
+    if (token && config.headers && !isPublicRequest(config)) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -46,9 +74,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const request = error.config as RetryableRequestConfig | undefined;
-    const isAuthRequest = request?.url?.startsWith('/auth/');
 
-    if (error.response?.status !== 401 || !request || request._retry || isAuthRequest) {
+    if (
+      error.response?.status !== 401 ||
+      !request ||
+      request._retry ||
+      isPublicAuthPath(request.url)
+    ) {
       return Promise.reject(error);
     }
 
@@ -61,9 +93,12 @@ apiClient.interceptors.response.use(
     request._retry = true;
 
     try {
-      const accessToken = await refreshAccessToken(refreshToken);
-      localStorage.setItem('access_token', accessToken);
-      request.headers.Authorization = `Bearer ${accessToken}`;
+      const tokens = await refreshTokens(refreshToken);
+      localStorage.setItem('access_token', tokens.access);
+      if (tokens.refresh) {
+        localStorage.setItem('refresh_token', tokens.refresh);
+      }
+      request.headers.Authorization = `Bearer ${tokens.access}`;
       return apiClient(request);
     } catch (refreshError) {
       window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
@@ -72,9 +107,9 @@ apiClient.interceptors.response.use(
   }
 );
 
-let refreshRequest: Promise<string> | null = null;
+let refreshRequest: Promise<RefreshResponse> | null = null;
 
-const refreshAccessToken = (refreshToken: string): Promise<string> => {
+const refreshTokens = (refreshToken: string): Promise<RefreshResponse> => {
   if (!refreshRequest) {
     refreshRequest = axios
       .post<RefreshResponse>(
@@ -82,7 +117,7 @@ const refreshAccessToken = (refreshToken: string): Promise<string> => {
         { refresh: refreshToken },
         { headers: { 'Content-Type': 'application/json' } },
       )
-      .then(({ data }) => data.access)
+      .then(({ data }) => data)
       .finally(() => {
         refreshRequest = null;
       });
