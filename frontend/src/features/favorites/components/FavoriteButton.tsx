@@ -1,8 +1,7 @@
-import { useState } from 'react';
 import type { FC } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../components/common';
 import { useAuth } from '../../../hooks/useAuth';
-import LoginPromptModal from '../../auth/components/LoginPromptModal';
 import { useRestaurantFavorite } from '../hooks/useRestaurantFavorite';
 
 export interface FavoriteButtonProps {
@@ -27,7 +26,7 @@ const HeartIcon: FC<{ filled?: boolean }> = ({ filled = false }) => (
 
 const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '' }) => {
   const { isAuthenticated } = useAuth();
-  const [isLoginPromptOpen, setIsLoginPromptOpen] = useState(false);
+  const navigate = useNavigate();
   const { isFavorite, isLoading, toggleFavorite } = useRestaurantFavorite(restaurantId);
 
   let buttonTitle = 'Log in to save favorites';
@@ -37,7 +36,7 @@ const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '' 
 
   const handleClick = async () => {
     if (!isAuthenticated) {
-      setIsLoginPromptOpen(true);
+      navigate('/login');
       return;
     }
 
@@ -45,27 +44,19 @@ const FavoriteButton: FC<FavoriteButtonProps> = ({ restaurantId, className = '' 
   };
 
   return (
-    <>
-      <Button
-        type="button"
-        variant={isFavorite ? 'secondary' : 'outline'}
-        size="sm"
-        className={className}
-        leftIcon={<HeartIcon filled={isFavorite} />}
-        onClick={handleClick}
-        isLoading={isLoading}
-        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-        title={buttonTitle}
-      >
-        {isFavorite ? 'Saved' : 'Save'}
-      </Button>
-      <LoginPromptModal
-        isOpen={isLoginPromptOpen}
-        onClose={() => setIsLoginPromptOpen(false)}
-        title="Log in to save favorites"
-        message="Log in or create an account to save the restaurants you like and find them again anytime."
-      />
-    </>
+    <Button
+      type="button"
+      variant={isFavorite ? 'secondary' : 'outline'}
+      size="sm"
+      className={className}
+      leftIcon={<HeartIcon filled={isFavorite} />}
+      onClick={handleClick}
+      isLoading={isLoading}
+      aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      title={buttonTitle}
+    >
+      {isFavorite ? 'Saved' : 'Save'}
+    </Button>
   );
 };
 

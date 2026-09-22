@@ -1,6 +1,7 @@
 import { useState, type FC } from 'react';
 import { Link } from 'react-router-dom';
 import type { Restaurant } from '../types/restaurant.types';
+import FavoriteButton from '../../favorites/components/FavoriteButton';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
@@ -34,9 +35,14 @@ const RestaurantCard: FC<RestaurantCardProps> = ({ restaurant, isFeatured = fals
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
         )}
+        {/* Favorite Button */}
+        <div className="absolute right-2 top-2 z-10">
+          <FavoriteButton restaurantId={restaurant.id} iconOnly />
+        </div>
+        
         {/* Delivery Time Badge */}
         {restaurant.delivery_time != null && (
-          <div className="absolute right-0 top-0 bg-surface px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-text-primary shadow-subtle border-b border-l border-border-default">
+          <div className="absolute bottom-0 right-0 bg-surface px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-text-primary shadow-subtle border-t border-l border-border-default">
             {restaurant.delivery_time} min
           </div>
         )}

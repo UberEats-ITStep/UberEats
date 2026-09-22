@@ -12,6 +12,7 @@ import NotFound from '../pages/NotFound';
 import OrderHistory from '../pages/OrderHistory';
 import OrderDetails from '../pages/OrderDetails';
 import Profile from '../pages/Profile';
+import Favorites from '../pages/Favorites';
 import RestaurantDetails from '../pages/RestaurantDetails';
 import Checkout from '../pages/Checkout';
 import IndexRoute from './IndexRoute';
@@ -83,6 +84,7 @@ const AnimatedRoutes: React.FC = () => {
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/profile" element={<Profile />} />
+            <Route path="/favorites" element={<Favorites />} />
             <Route path="/orders" element={<OrderHistory />} />
             <Route path="/orders/:orderId" element={<OrderDetails />} />
             <Route path="/checkout" element={<Checkout />} />

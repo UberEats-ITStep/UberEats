@@ -270,6 +270,7 @@ REST_FRAMEWORK = {
         "auth_login": "10/min",
         "auth_register": "5/min",
         "auth_firebase": "10/min",
+        "favorites": "60/min",
         "verify_email": "10/hour",
         "resend_verification": "3/hour",
         "password_reset_request": os.getenv(

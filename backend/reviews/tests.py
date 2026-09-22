@@ -216,3 +216,113 @@ class ReviewApiTests(APITestCase):
         self.assertEqual(response.data[0]['id'], review2.id)
         self.assertEqual(response.data[1]['id'], review1.id)
 
+
+from decimal import Decimal
+from django.core.management import call_command
+from django.test import TestCase
+from django.contrib.auth import get_user_model
+from restaurants.models import Cuisine, Restaurant, MenuItem, Category
+from orders.models import Order, OrderItem
+from reviews.models import Review
+
+User = get_user_model()
+
+
+class SeedReviewsCommandTests(TestCase):
+    def setUp(self):
+        # Create a cuisine and category
+        self.cuisine = Cuisine.objects.create(name="Japanese")
+        self.category = Category.objects.create(name="Sushi")
+
+        # Create a restaurant
+        self.restaurant = Restaurant.objects.create(
+            name="Tokyo Bites",
+            cuisine=self.cuisine,
+            rating=Decimal("0.00"),
+            delivery_time=30
+        )
+
+        # Create menu item
+        self.menu_item = MenuItem.objects.create(
+            restaurant=self.restaurant,
+            category=self.category,
+            name="California Roll",
+            price=Decimal("12.00"),
+            is_available=True
+        )
+
+    def test_dry_run_does_not_create_records(self):
+        call_command("seed_reviews", "--dry-run")
+        
+        self.assertEqual(Review.objects.count(), 0)
+        self.assertEqual(Order.objects.count(), 0)
+        self.assertFalse(User.objects.filter(email__endswith="biteup.demo").exists())
+
+    def test_seeding_creates_target_count_and_aggregates_ratings(self):
+        call_command("seed_reviews")
+
+        # Should create between 7 and 10 reviews for the active restaurant
+        reviews_count = Review.objects.filter(restaurant=self.restaurant).count()
+        self.assertTrue(7 <= reviews_count <= 10)
+
+        # Should create exactly 15 demo users
+        demo_users_count = User.objects.filter(email__endswith="biteup.demo").count()
+        self.assertEqual(demo_users_count, 15)
+
+        # Should create an order for every review
+        orders_count = Order.objects.filter(restaurant=self.restaurant).count()
+        self.assertEqual(orders_count, reviews_count)
+
+        # The restaurant rating should be updated via the signal
+        self.restaurant.refresh_from_db()
+        self.assertTrue(self.restaurant.rating > 0)
+        self.assertEqual(self.restaurant.review_count, reviews_count)
+
+    def test_seeding_is_idempotent(self):
+        call_command("seed_reviews")
+        initial_reviews_count = Review.objects.count()
+        initial_orders_count = Order.objects.count()
+
+        # Run again
+        call_command("seed_reviews")
+        
+        self.assertEqual(Review.objects.count(), initial_reviews_count)
+        self.assertEqual(Order.objects.count(), initial_orders_count)
+
+    def test_restores_missing_seeded_reviews(self):
+        call_command("seed_reviews")
+        initial_count = Review.objects.count()
+
+        # Delete one seeded review
+        Review.objects.first().delete()
+        self.assertEqual(Review.objects.count(), initial_count - 1)
+
+        # Run again, should restore exactly 1 review
+        call_command("seed_reviews")
+        self.assertEqual(Review.objects.count(), initial_count)
+
+    def test_preserves_existing_user_reviews(self):
+        real_user = User.objects.create_user(username="real", email="real@example.com")
+        real_order = Order.objects.create(
+            client=real_user,
+            restaurant=self.restaurant,
+            status=Order.STATUS_COMPLETED,
+            total_price=Decimal("10.00"),
+            street="Real St",
+            building="1"
+        )
+        Review.objects.create(
+            client=real_user,
+            restaurant=self.restaurant,
+            order=real_order,
+            rating=5,
+            comment="Real comment"
+        )
+
+        call_command("seed_reviews")
+
+        # The real review is preserved
+        self.assertTrue(Review.objects.filter(client=real_user).exists())
+        # The total reviews should be (7 to 10) + 1 real review
+        total_reviews = Review.objects.count()
+        self.assertTrue(8 <= total_reviews <= 11)

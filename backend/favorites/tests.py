@@ -233,3 +233,20 @@ class FavoriteApiTests(APITestCase):
             self.client.get(check_url, {"restaurant": 999999}).status_code,
             status.HTTP_404_NOT_FOUND,
         )
+
+    def test_check_endpoint_is_optimized(self):
+        Favorite.objects.create(user=self.user, restaurant=self.restaurant)
+        self.authenticate()
+        check_url = reverse("favorite-check")
+
+        # The check endpoint should only execute 4 queries:
+        # 1. User authentication/session check
+        # 2. ScopedRateThrottle (if hitting DB, though usually cache, but sqlite might hit DB if cache is DB)
+        # 3. Restaurant existence check
+        # 4. Favorite existence check
+        # Let's ensure it executes a very small bounded number of queries, not N+1
+        with self.assertNumQueries(2):
+            response = self.client.get(check_url, {"restaurant": self.restaurant.id})
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_favorite"])

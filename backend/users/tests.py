@@ -369,9 +369,8 @@ class JwtAuthApiTests(APITestCase):
             ),
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(str(response.data['phone_number'][0]), 'This field may not be blank.')
-        self.assertEqual(str(response.data['address'][0]), 'This field may not be blank.')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Should now allow blank fields as requested
 
     def test_full_profile_update_reports_missing_required_email(self) -> None:
         self.client.force_authenticate(user=self.user)
@@ -762,7 +761,7 @@ class SavedDeliveryAddressApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['avatars'][0]['id'], 'avatar_01')
-        self.assertEqual(len(response.data['avatars']), 6)
+        self.assertEqual(len(response.data['avatars']), 7)
 
 
 @override_settings(

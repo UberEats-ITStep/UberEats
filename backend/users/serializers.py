@@ -124,11 +124,15 @@ class ProfileSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(
         max_length=16,
         required=False,
+        allow_null=True,
+        allow_blank=True,
         validators=[PHONE_NUMBER_VALIDATOR],
     )
     address = serializers.CharField(
         max_length=500,
         required=False,
+        allow_null=True,
+        allow_blank=True,
     )
     default_address = serializers.SerializerMethodField()
 

@@ -1,5 +1,6 @@
 import { useState, type FC } from 'react';
 import type { RestaurantDetails } from '../types/restaurant.types';
+import FavoriteButton from '../../favorites/components/FavoriteButton';
 
 export interface RestaurantHeroProps {
   restaurant: RestaurantDetails;
@@ -28,6 +29,9 @@ const RestaurantHero: FC<RestaurantHeroProps> = ({ restaurant }) => {
             >
               {restaurant.is_open_now ? 'Open now' : 'Closed'}
             </span>
+            <div className="ml-auto lg:ml-4">
+              <FavoriteButton restaurantId={restaurant.id} />
+            </div>
           </div>
           <div className="mb-6">
             <h1 className="text-5xl lg:text-7xl font-serif italic tracking-tight text-text-primary leading-none">
