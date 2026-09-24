@@ -1,8 +1,24 @@
 import { useMemo, useState, type FC } from 'react';
 import Map, { NavigationControl } from 'react-map-gl/maplibre';
-import type { StyleSpecification } from 'maplibre-gl';
+import { setWorkerUrl, type StyleSpecification } from 'maplibre-gl';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { Button, Input } from '../../../components/common';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+setWorkerUrl(maplibreWorkerUrl);
+
+const fallbackMapStyle: StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '&copy; OpenStreetMap contributors',
+    },
+  },
+  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+};
 
 export interface ResolvedLocation { formattedAddress: string; street: string; building: string; latitude: number; longitude: number; }
 interface Props { initialLatitude?: number; initialLongitude?: number; initialAddress?: string; onResolve: (location: ResolvedLocation) => void; }
@@ -13,7 +29,12 @@ const LocationPicker: FC<Props> = ({ initialLatitude = 50.62, initialLongitude =
   const [viewState, setViewState] = useState({ latitude: initialLatitude, longitude: initialLongitude, zoom: 15 });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const mapStyle = useMemo(() => key ? `https://api.maptiler.com/maps/basic-v2/style.json?key=${key}` : ({ version: 8, sources: { osm: { type: 'raster', tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256 } }, layers: [{ id: 'osm', type: 'raster', source: 'osm' }] } as StyleSpecification), [key]);
+  const mapStyle = useMemo(
+    () => key
+      ? `https://api.maptiler.com/maps/basic-v2/style.json?key=${key}`
+      : fallbackMapStyle,
+    [key],
+  );
 
   type GeoFeature = { center?: [number, number]; address?: string; text?: string; place_name?: string; place_type?: string[] };
   const accept = (feature: GeoFeature) => {
@@ -32,6 +53,7 @@ const LocationPicker: FC<Props> = ({ initialLatitude = 50.62, initialLongitude =
     setBusy(true); setMessage(null);
     try {
       const response = await fetch(url);
+      if (!response.ok) throw new Error(`Address lookup failed (${response.status}).`);
       const data = await response.json();
       if (!data.features?.length) throw new Error('No matching address found.');
       return data.features;
@@ -49,7 +71,12 @@ const LocationPicker: FC<Props> = ({ initialLatitude = 50.62, initialLongitude =
   const confirmPin = async () => {
     if (!key) { onResolve({ formattedAddress: query.trim(), street: query.trim(), building: '', latitude: viewState.latitude, longitude: viewState.longitude }); setMessage('Map location confirmed.'); return; }
     const features = await request(`https://api.maptiler.com/geocoding/${viewState.longitude},${viewState.latitude}.json?key=${key}`);
-    if (features) accept(features.find((item: GeoFeature) => item.place_type?.includes('address')) || features[0]);
+    if (features) {
+      accept(features.find((item: GeoFeature) => item.place_type?.includes('address')) || features[0]);
+      return;
+    }
+    onResolve({ formattedAddress: query.trim(), street: query.trim(), building: '', latitude: viewState.latitude, longitude: viewState.longitude });
+    setMessage('Map location confirmed. Automatic address lookup is unavailable.');
   };
 
   return <div className="space-y-3">

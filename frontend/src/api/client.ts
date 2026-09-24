@@ -50,8 +50,10 @@ const isPublicRequest = (config: Pick<InternalAxiosRequestConfig, 'url' | 'metho
   return PUBLIC_READ_PATHS.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 };
 
+const apiBaseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api').replace(/\/+$/, '');
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api',
+  baseURL: apiBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -113,7 +115,7 @@ const refreshTokens = (refreshToken: string): Promise<RefreshResponse> => {
   if (!refreshRequest) {
     refreshRequest = axios
       .post<RefreshResponse>(
-        `${apiClient.defaults.baseURL}/auth/refresh/`,
+        `${apiBaseUrl}/auth/refresh/`,
         { refresh: refreshToken },
         { headers: { 'Content-Type': 'application/json' } },
       )
